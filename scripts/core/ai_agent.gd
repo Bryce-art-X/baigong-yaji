@@ -88,6 +88,9 @@ static func _do_action(state: GameState) -> void:
 				RulesEngine.reserve_deck(state, tier)
 				return
 
+	# 5. Legal pass if no other move exists
+	RulesEngine.pass_turn(state)
+
 static func _score_buy(state: GameState, p: PlayerState, card: CardData.CraftCard) -> float:
 	var pay_info := p.compute_payment(card)
 	var gold_spent := int(pay_info["payment"][GemTypes.GOLD])

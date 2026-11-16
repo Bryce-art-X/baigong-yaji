@@ -1,0 +1,83 @@
+extends SceneTree
+## Rebuilds data/craft_data.json with our original, 5-way cyclically symmetric
+## cost/prestige curve while preserving all 90 Chinese craft names and 10 Masters.
+##
+## Usage: godot --headless --path . --script res://tools/rebuild_craft_data.gd
+
+const GEMS: Array[String] = ["jade", "porcelain", "bamboo", "cinnabar", "ink"]
+
+# Each entry: [prestige, {offset_from_bonus: amount}]
+# Offset 0 = same color as bonus, 1 = next color, ..., 4 = previous color.
+const TIER1_TEMPLATES: Array = [
+	[0, {1: 1, 2: 1, 3: 1, 4: 1}],  # 4 colors x1 (4)
+	[0, {1: 2, 3: 2}],              # 2 colors x2 (4)
+	[0, {1: 1, 2: 2, 4: 1}],        # 3 colors (4)
+	[0, {2: 2, 4: 1}],              # 2 colors (3)
+	[0, {3: 3}],                    # 1 color x3 (3)
+	[0, {0: 2, 1: 1, 4: 2}],        # includes own color (5)
+	[0, {1: 1, 2: 1, 3: 2, 4: 1}],  # 4 colors (5)
+	[1, {2: 3, 4: 2}],              # 1pt dual-color (5)
+]
+
+const TIER2_TEMPLATES: Array = [
+	[1, {1: 2, 2: 2, 3: 2}],        # 3 colors (6)
+	[1, {0: 3, 2: 2, 4: 2}],        # includes own (7)
+	[2, {1: 4, 3: 2, 4: 1}],        # 3 colors (7)
+	[2, {2: 5}],                    # mono-5 (5)
+	[2, {1: 3, 4: 4}],              # dual-color (7)
+	[3, {0: 5, 3: 2}],              # 3pt dual-color (7)
+]
+
+const TIER3_TEMPLATES: Array = [
+	[3, {1: 3, 2: 3, 3: 4, 4: 3}],  # 4 colors (13)
+	[4, {4: 6, 1: 2}],              # heavy + splash (8)
+	[4, {0: 3, 2: 5, 3: 3}],        # 3 colors (11)
+	[5, {0: 3, 4: 6, 1: 2}],        # 5pt flagship (11)
+]
+
+func _init() -> void:
+	var raw := RulesEngine.load_raw_data()
+	var old_cards: Array = raw.get("cards", [])
+	var by_tier_bonus: Dictionary = {}
+	for c in old_cards:
+		var key := "%d_%s" % [int(c["tier"]), str(c["bonus"])]
+		if not by_tier_bonus.has(key):
+			by_tier_bonus[key] = []
+		by_tier_bonus[key].append(str(c["name"]))
+
+	var new_cards: Array = []
+	var tier_specs := {1: TIER1_TEMPLATES, 2: TIER2_TEMPLATES, 3: TIER3_TEMPLATES}
+
+	for tier in [1, 2, 3]:
+		var templates: Array = tier_specs[tier]
+		var idx_counter := 1
+		for gi in range(GEMS.size()):
+			var bonus := GEMS[gi]
+			var names: Array = by_tier_bonus.get("%d_%s" % [tier, bonus], [])
+			for ti in range(templates.size()):
+				var tmpl: Array = templates[ti]
+				var prestige := int(tmpl[0])
+				var offsets: Dictionary = tmpl[1]
+				var cost: Dictionary = {}
+				for off in offsets.keys():
+					var target_gem := GEMS[(gi + int(off)) % GEMS.size()]
+					cost[target_gem] = int(offsets[off])
+				var card_name := str(names[ti]) if ti < names.size() else "器物_%d_%d" % [tier, idx_counter]
+				new_cards.append({
+					"id": "t%d_%02d" % [tier, idx_counter],
+					"tier": tier,
+					"bonus": bonus,
+					"prestige": prestige,
+					"name": card_name,
+					"cost": cost,
+				})
+				idx_counter += 1
+
+	var out := {
+		"cards": new_cards,
+		"masters": raw.get("masters", []),
+	}
+	var f := FileAccess.open("res://data/craft_data.json", FileAccess.WRITE)
+	f.store_string(JSON.stringify(out, "  ") + "\n")
+	print("Rebuilt craft_data.json: %d cards, %d masters" % [new_cards.size(), out["masters"].size()])
+	quit(0)

@@ -72,6 +72,10 @@ static func serialize_state(state: GameState) -> Dictionary:
 		})
 
 	return {
+		"version": 2,
+		"rng_seed": state.rng_seed,
+		"config": state.config.duplicate(true),
+		"history": state.history.duplicate(true),
 		"target_prestige": state.target_prestige,
 		"bank": state.bank.duplicate(),
 		"decks": decks_d,
@@ -89,6 +93,9 @@ static func serialize_state(state: GameState) -> Dictionary:
 
 static func deserialize_state(d: Dictionary) -> GameState:
 	var s := GameState.new()
+	s.rng_seed = int(d.get("rng_seed", 0))
+	s.config = d.get("config", {}).duplicate(true)
+	s.history = d.get("history", []).duplicate(true)
 	s.target_prestige = int(d.get("target_prestige", 15))
 	s.bank = d.get("bank", GemTypes.create_empty_pool(true)).duplicate()
 

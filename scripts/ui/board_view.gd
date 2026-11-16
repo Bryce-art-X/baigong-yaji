@@ -4,10 +4,10 @@ extends Control
 signal return_to_menu_requested
 signal restart_requested
 
+var _controller: GameController
 var state: GameState
 var _selected_gems: Array[String] = []
 var _discard_pool: Dictionary = {}
-var _undo_stack: Array[Dictionary] = []
 var _stats_recorded: bool = false
 var _ai_timer: Timer
 
@@ -39,11 +39,15 @@ func _ready() -> void:
 	_build_skeleton()
 
 func start_game(p_state: GameState) -> void:
-	state = p_state
+	_controller = GameController.new(p_state)
+	_controller.events_applied.connect(func(_act: GameAction, evs: Array) -> void:
+		EventBus.game_events.emit(evs)
+	)
+	state = _controller.state
 	_selected_gems.clear()
 	_discard_pool.clear()
-	_undo_stack.clear()
 	_stats_recorded = false
+	EventBus.game_started.emit(state)
 	_refresh_all()
 	_schedule_ai_if_needed()
 
@@ -301,7 +305,13 @@ func _refresh_all() -> void:
 	_refresh_log()
 
 	if _undo_btn != null:
-		_undo_btn.disabled = _undo_stack.is_empty() or cur.is_ai or state.phase == GameState.TurnPhase.GAME_OVER
+		var can_undo := false
+		for d in state.history:
+			var pi := int(d.get("p", -1))
+			if pi >= 0 and pi < state.players.size() and not state.players[pi].is_ai:
+				can_undo = true
+				break
+		_undo_btn.disabled = (not can_undo) or cur.is_ai or state.phase == GameState.TurnPhase.GAME_OVER
 
 	if not cur.is_ai and state.phase == GameState.TurnPhase.ACTION:
 		SaveManager.save_autosave(state)
@@ -573,83 +583,61 @@ func _is_selection_valid() -> bool:
 		return bool(RulesEngine.can_take_two_same(state, _selected_gems[0])["ok"])
 	return bool(RulesEngine.can_take_different(state, _selected_gems)["ok"])
 
-func _push_undo() -> void:
-	_undo_stack.append(SaveManager.serialize_state(state))
-	if _undo_stack.size() > 15:
-		_undo_stack.pop_front()
-
 func _on_undo_pressed() -> void:
-	if _undo_stack.is_empty():
+	if _controller == null:
 		return
 	_ai_timer.stop()
-	var snap: Dictionary = _undo_stack.pop_back()
-	state = SaveManager.deserialize_state(snap)
-	_selected_gems.clear()
-	_discard_pool.clear()
-	SfxManager.play_click()
-	_refresh_all()
+	if _controller.undo_last_human_action():
+		state = _controller.state
+		_selected_gems.clear()
+		_discard_pool.clear()
+		SfxManager.play_click()
+		_refresh_all()
 
 func _on_confirm_take_pressed() -> void:
 	if not _is_selection_valid():
 		return
-	_push_undo()
-	var res: Dictionary
-	if _selected_gems.size() == 2 and _selected_gems[0] == _selected_gems[1]:
-		res = RulesEngine.take_two_same(state, _selected_gems[0])
-		if bool(res["ok"]):
-			SfxManager.play_take_chip(2)
+	var act: GameAction
+	var take_cnt := _selected_gems.size()
+	if take_cnt == 2 and _selected_gems[0] == _selected_gems[1]:
+		act = GameAction.take_two(_selected_gems[0])
 	else:
-		var cnt := _selected_gems.size()
-		res = RulesEngine.take_different(state, _selected_gems)
-		if bool(res["ok"]):
-			SfxManager.play_take_chip(cnt)
+		act = GameAction.take_different(_selected_gems)
+	var res := _controller.apply(act)
 	if bool(res["ok"]):
+		SfxManager.play_take_chip(take_cnt)
 		_selected_gems.clear()
 		_after_player_move()
-	else:
-		_undo_stack.pop_back()
 
 func _on_buy_requested(tier: int, slot: int, reserved_idx: int) -> void:
-	_push_undo()
 	var prev_masters := state.current_player().masters.size()
 	var card_prestige := 0
 	if reserved_idx >= 0 and reserved_idx < state.current_player().reserved.size():
 		card_prestige = state.current_player().reserved[reserved_idx].prestige
 	elif state.board.has(tier) and slot >= 0 and slot < 4 and state.board[tier][slot] != null:
 		card_prestige = state.board[tier][slot].prestige
-	var res: Dictionary
-	if reserved_idx >= 0:
-		res = RulesEngine.buy_reserved(state, reserved_idx)
-	else:
-		res = RulesEngine.buy_board(state, tier, slot)
+	var act := GameAction.buy_reserved(reserved_idx) if reserved_idx >= 0 else GameAction.buy_board(tier, slot)
+	var res := _controller.apply(act)
 	if bool(res["ok"]):
 		_selected_gems.clear()
 		SfxManager.play_buy(card_prestige)
 		if state.players[state.current_player_idx].masters.size() > prev_masters:
 			SfxManager.play_master()
 		_after_player_move()
-	else:
-		_undo_stack.pop_back()
 
 func _on_reserve_board(tier: int, slot: int) -> void:
-	_push_undo()
-	var res := RulesEngine.reserve_board(state, tier, slot)
+	var res := _controller.apply(GameAction.reserve_board(tier, slot))
 	if bool(res["ok"]):
 		_selected_gems.clear()
 		SfxManager.play_reserve()
 		_after_player_move()
-	else:
-		_undo_stack.pop_back()
 
 func _on_reserve_deck(tier: int) -> void:
-	_push_undo()
-	var res := RulesEngine.reserve_deck(state, tier)
+	var res := _controller.apply(GameAction.reserve_deck(tier))
 	if bool(res["ok"]):
 		_selected_gems.clear()
 		SfxManager.play_reserve()
 		_after_player_move()
-	else:
-		_undo_stack.pop_back()
 
 func _after_player_move() -> void:
 	_refresh_all()
@@ -748,7 +736,7 @@ func _show_discard_modal() -> void:
 	ok_btn.disabled = chosen_sum != excess
 	UITheme.style_button(ok_btn, Color("295439"), UITheme.AFFORD_GREEN)
 	ok_btn.pressed.connect(func() -> void:
-		var res := RulesEngine.discard_chips(state, _discard_pool)
+		var res := _controller.apply(GameAction.discard(_discard_pool))
 		if bool(res["ok"]):
 			_discard_pool.clear()
 			_after_player_move()
@@ -772,7 +760,7 @@ func _show_choose_master_modal() -> void:
 		var mv := MasterView.new()
 		mv.setup(m, true)
 		mv.master_clicked.connect(func(mid: String) -> void:
-			RulesEngine.choose_master(state, mid)
+			_controller.apply(GameAction.choose_master(mid))
 			_after_player_move()
 		)
 		row.add_child(mv)

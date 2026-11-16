@@ -1,5 +1,10 @@
 # 更新日志
 
+## [0.4.0] - 2026-11-16 · P1 规则内核重构与自研数值平衡
+- 新增 `GameAction`、`GameController`、`NetTransport` 占位接口，所有状态变更统一经 `RulesEngine.apply_action` 验证并产出领域事件，支持确定性 `replay()` 与无快照悔棋。
+- 新增 `PASS` 合法跳过处理及完整边界单测（18 项全部通过）。
+- 使用 `tools/rebuild_craft_data.gd` 重制 90 张器物自研费用曲线，并通过 `tools/balance_sim.gd` 完成 600 场模拟验证，产出 `docs/BALANCE_REPORT.md`。
+
 ## [0.3.0] - 2026-11-16 · P0 工程基建
 - 初始化 git 仓库，补充 `.gitignore` / `.gitattributes`。
 - 新增 Autoload：`EventBus`（全局信号）、`Settings`（持久化设置，user://settings.cfg）。
