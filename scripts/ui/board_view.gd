@@ -31,6 +31,7 @@ var _reserved_slots: Array[CardView] = []
 var _reserved_empty_lbl: Label
 var _reserved_title: Label
 var _bank_slots: Dictionary = {} # gem -> {btn, sel_lbl, cnt_lbl}
+var _selection_tray: HBoxContainer
 var _selection_lbl: Label
 var _confirm_take_btn: Button
 var _clear_take_btn: Button
@@ -209,21 +210,11 @@ func _build_skeleton() -> void:
 	body.add_theme_constant_override("separation", 12)
 	main_vbox.add_child(body)
 
-	# Left: Persistent 4 Player Panels
-	var left_panel := PanelContainer.new()
-	left_panel.custom_minimum_size = Vector2(268, 0)
-	left_panel.add_theme_stylebox_override("panel", UITheme.make_panel_style())
-	body.add_child(left_panel)
-
+	# Left: Floating Player Plaques directly on tabletop
 	var left_v := VBoxContainer.new()
-	left_v.add_theme_constant_override("separation", 8)
-	left_panel.add_child(left_v)
-
-	var p_hdr := Label.new()
-	p_hdr.text = "诸位匠师"
-	p_hdr.add_theme_font_size_override("font_size", 16)
-	p_hdr.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
-	left_v.add_child(p_hdr)
+	left_v.custom_minimum_size = Vector2(256, 0)
+	left_v.add_theme_constant_override("separation", 10)
+	body.add_child(left_v)
 
 	for _i in range(4):
 		var pp := PlayerPanel.new()
@@ -270,6 +261,13 @@ func _build_skeleton() -> void:
 		deck_btn.custom_minimum_size = Vector2(118, 166)
 		deck_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		deck_btn.pressed.connect(func() -> void: _on_reserve_deck(tier))
+		var pat := TextureRect.new()
+		pat.texture = UITheme.card_pattern(tier)
+		pat.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		pat.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		pat.stretch_mode = TextureRect.STRETCH_SCALE
+		pat.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		deck_btn.add_child(pat)
 		row.add_child(deck_btn)
 		_deck_btns[tier] = deck_btn
 
@@ -376,10 +374,17 @@ func _build_skeleton() -> void:
 
 		_bank_slots[g] = {"btn": chip_btn, "sel_lbl": sel_lbl, "cnt_lbl": cnt_lbl}
 
+	_selection_tray = HBoxContainer.new()
+	_selection_tray.alignment = BoxContainer.ALIGNMENT_CENTER
+	_selection_tray.custom_minimum_size = Vector2(0, 32)
+	_selection_tray.add_theme_constant_override("separation", 8)
+	right_v.add_child(_selection_tray)
+
 	_selection_lbl = Label.new()
-	_selection_lbl.text = "未选材料"
+	_selection_lbl.text = "点击玉石：3 异色或 2 同色"
+	_selection_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_selection_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_selection_lbl.add_theme_font_size_override("font_size", 13)
+	_selection_lbl.add_theme_font_size_override("font_size", 12)
 	_selection_lbl.add_theme_color_override("font_color", UITheme.TEXT_MUTED)
 	right_v.add_child(_selection_lbl)
 
@@ -679,14 +684,21 @@ func _refresh_bank_and_selection() -> void:
 		cnt_lbl.text = "%s ×%d" % [GemTypes.gem_name(g), amt]
 		cnt_lbl.add_theme_color_override("font_color", UITheme.TEXT_MUTED if g == GemTypes.GOLD else UITheme.TEXT_MAIN)
 
+	for c in _selection_tray.get_children():
+		c.queue_free()
+
 	if _selected_gems.is_empty():
-		_selection_lbl.text = "点击上方材料：拿 3 种不同，或双击同种（余量 ≥ 4）"
+		_selection_lbl.text = "点击玉石：拿 3 异色，或双击同种（≥4）"
 		_confirm_take_btn.disabled = true
 	else:
-		var names: Array[String] = []
 		for g in _selected_gems:
-			names.append(GemTypes.gem_name(g))
-		_selection_lbl.text = "已选：%s" % " + ".join(names)
+			var tr := TextureRect.new()
+			tr.texture = UITheme.gem_icon(g)
+			tr.custom_minimum_size = Vector2(28, 28)
+			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			_selection_tray.add_child(tr)
+		_selection_lbl.text = "待拿取 %d 枚材料" % _selected_gems.size()
 		_confirm_take_btn.disabled = not (human_turn and _is_selection_valid())
 
 func _on_bank_gem_clicked(g: String) -> void:
@@ -751,10 +763,28 @@ func _on_events_applied(_action: GameAction, evs: Array) -> void:
 					SaveManager.unlock_codex_entry("cards", str(ev.get("card_id", "")))
 					if _is_tutorial and _tutorial_step <= 2:
 						_tutorial_step = 3
+				var p_pos := _player_center(pi)
+				if str(ev.get("from", "")) == "board":
+					var t := int(ev.get("tier", 1))
+					var s := int(ev.get("slot", 0))
+					var card_pos := _card_center(t, s)
+					var bonus_g := ""
+					for c in state.players[pi].purchased:
+						if c.id == str(ev.get("card_id", "")):
+							bonus_g = c.bonus
+							break
+					if bonus_g != "":
+						_fx.fly_card(card_pos, p_pos, bonus_g)
+				var pay: Dictionary = ev.get("payment", {})
+				var delay := 0.0
+				for g in pay.keys():
+					for _k in range(int(pay[g])):
+						_fx.fly_chip(str(g), p_pos, _bank_center(str(g)), delay)
+						delay += 0.04
 				var pts := int(ev.get("prestige", 0))
-				_fx.burst_gold(_player_center(pi), 22 if pts > 0 else 12)
+				_fx.burst_gold(p_pos, 22 if pts > 0 else 12)
 				if pts > 0:
-					_fx.float_text("+%d 声望" % pts, _player_center(pi), UITheme.GOLD_ACCENT)
+					_fx.float_text("+%d 声望" % pts, p_pos, UITheme.GOLD_ACCENT)
 			"refill":
 				var tier := int(ev.get("tier", 1))
 				var slot := int(ev.get("slot", 0))
@@ -784,8 +814,14 @@ func _player_center(idx: int) -> Vector2:
 func _bank_center(gem: String) -> Vector2:
 	if _bank_slots.has(gem):
 		var b: Button = _bank_slots[gem]["btn"]
-		return b.global_position + Vector2(36, b.size.y * 0.5)
+		return b.global_position + b.size * 0.5
 	return Vector2(1260, 260)
+
+func _card_center(tier: int, slot: int) -> Vector2:
+	if _card_slots.has(tier) and slot >= 0 and slot < _card_slots[tier].size():
+		var cv: CardView = _card_slots[tier][slot]
+		return cv.global_position + cv.size * 0.5
+	return Vector2(720, 450)
 
 func _on_undo_pressed() -> void:
 	if _controller == null:

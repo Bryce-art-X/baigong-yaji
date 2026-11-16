@@ -125,6 +125,17 @@ func _ensure_built(is_res: bool) -> void:
 	_bonus_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_bonus_icon)
 
+	# Subtle bottom dark ribbon for craft name legibility
+	var bot_band := ColorRect.new()
+	bot_band.color = Color(0.06, 0.04, 0.03, 0.62)
+	bot_band.anchor_left = 0.0
+	bot_band.anchor_right = 1.0
+	bot_band.anchor_top = 1.0
+	bot_band.anchor_bottom = 1.0
+	bot_band.offset_top = -24.0
+	bot_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(bot_band)
+
 	# Bottom-left vertical stack of circular cost pips (authentic Splendor layout!)
 	var cost_col := VBoxContainer.new()
 	cost_col.anchor_left = 0.0
@@ -172,10 +183,10 @@ func _ensure_built(is_res: bool) -> void:
 	_title_lbl.offset_top = -24.0
 	_title_lbl.offset_bottom = -4.0
 	_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_title_lbl.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	_title_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_title_lbl.clip_text = true
-	_title_lbl.add_theme_font_size_override("font_size", 11)
-	_title_lbl.add_theme_color_override("font_color", Color("EFE2C6"))
+	_title_lbl.add_theme_font_size_override("font_size", 12)
+	_title_lbl.add_theme_color_override("font_color", Color("F5E8CD"))
 	_title_lbl.add_theme_color_override("font_shadow_color", Color.BLACK)
 	_title_lbl.add_theme_constant_override("shadow_offset_x", 1)
 	_title_lbl.add_theme_constant_override("shadow_offset_y", 1)

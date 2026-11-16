@@ -46,16 +46,60 @@ func fly_chip(gem: String, from_global: Vector2, to_global: Vector2, delay: floa
 	icon.modulate.a = 0.0 if delay > 0.0 else 1.0
 	add_child(icon)
 
-	var dur := 0.36 * sc
+	var dur := 0.38 * sc
+	var mid := (from_global + to_global) * 0.5 + Vector2(0, -48.0)
 	var tw := create_tween()
 	if delay > 0.0:
 		tw.tween_interval(delay * sc)
 		tw.tween_property(icon, "modulate:a", 1.0, 0.04)
-	tw.set_parallel(true)
-	tw.tween_property(icon, "global_position", to_global - Vector2(16, 16), dur).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	tw.tween_property(icon, "scale", Vector2(0.75, 0.75), dur).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tw.set_parallel(false)
+	tw.tween_method(func(t: float) -> void:
+		if not is_instance_valid(icon):
+			return
+		var a := from_global.lerp(mid, t)
+		var b := mid.lerp(to_global, t)
+		icon.global_position = a.lerp(b, t) - Vector2(16, 16)
+		var s := lerpf(1.15, 0.72, t)
+		icon.scale = Vector2(s, s)
+	, 0.0, 1.0, dur).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tw.tween_callback(icon.queue_free)
+
+func fly_card(from_global: Vector2, to_global: Vector2, bonus_gem: String) -> void:
+	var sc := _speed_scale()
+	if sc <= 0.0:
+		return
+	var card_fx := PanelContainer.new()
+	card_fx.custom_minimum_size = Vector2(84, 118)
+	card_fx.size = Vector2(84, 118)
+	card_fx.pivot_offset = Vector2(42, 59)
+	card_fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = GemTypes.gem_color(bonus_gem).darkened(0.45)
+	sb.border_color = UITheme.GOLD_ACCENT
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(8)
+	sb.shadow_color = Color(0, 0, 0, 0.5)
+	sb.shadow_size = 6
+	card_fx.add_theme_stylebox_override("panel", sb)
+	var icon := TextureRect.new()
+	icon.texture = UITheme.gem_icon(bonus_gem)
+	icon.custom_minimum_size = Vector2(36, 36)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_fx.add_child(icon)
+
+	card_fx.global_position = from_global - Vector2(42, 59)
+	add_child(card_fx)
+
+	var dur := 0.42 * sc
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(card_fx, "global_position", to_global - Vector2(42, 59), dur).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(card_fx, "scale", Vector2(0.35, 0.35), dur).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(card_fx, "rotation_degrees", 12.0, dur)
+	tw.tween_property(card_fx, "modulate:a", 0.2, dur).set_delay(dur * 0.55)
+	tw.set_parallel(false)
+	tw.tween_callback(card_fx.queue_free)
 
 func float_text(text: String, at_global: Vector2, color: Color = UITheme.GOLD_ACCENT) -> void:
 	var sc := _speed_scale()
