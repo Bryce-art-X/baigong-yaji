@@ -26,10 +26,17 @@ func _ready() -> void:
 	_refresh_seats()
 
 func _build_ui() -> void:
-	var bg := ColorRect.new()
-	bg.color = UITheme.BG_DARK
+	var bg := TextureRect.new()
+	bg.texture = UITheme.table_bg()
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
+
+	var scrim := ColorRect.new()
+	scrim.color = Color(0.05, 0.03, 0.02, 0.35)
+	scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(scrim)
 
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

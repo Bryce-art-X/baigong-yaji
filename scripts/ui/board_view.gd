@@ -95,10 +95,17 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 
 func _build_skeleton() -> void:
-	var bg := ColorRect.new()
-	bg.color = UITheme.BG_DARK
+	var bg := TextureRect.new()
+	bg.texture = UITheme.table_bg()
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
+
+	var scrim := ColorRect.new()
+	scrim.color = Color(0.05, 0.03, 0.02, 0.30)
+	scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(scrim)
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -734,6 +741,7 @@ func _on_events_applied(_action: GameAction, evs: Array) -> void:
 					if _is_tutorial and _tutorial_step <= 2:
 						_tutorial_step = 3
 				var pts := int(ev.get("prestige", 0))
+				_fx.burst_gold(_player_center(pi), 22 if pts > 0 else 12)
 				if pts > 0:
 					_fx.float_text("+%d 声望" % pts, _player_center(pi), UITheme.GOLD_ACCENT)
 			"refill":
@@ -751,6 +759,7 @@ func _on_events_applied(_action: GameAction, evs: Array) -> void:
 					if m.id == mid:
 						m_name = "%s·%s" % [m.name, m.title]
 						break
+				_fx.burst_gold(_player_center(pi), 28)
 				_fx.show_banner("名士「%s」亲临 %s 的雅集 (+%d 声望)" % [m_name, state.players[pi].name, int(ev.get("prestige", 3))])
 			"final_round":
 				_fx.show_banner("【终局钟鸣】%s 率先达到 %d 声望，本轮结束后结算！" % [state.players[int(ev["player"])].name, int(ev["score"])])

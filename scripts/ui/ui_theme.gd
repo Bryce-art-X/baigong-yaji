@@ -2,7 +2,7 @@ class_name UITheme
 extends RefCounted
 
 const BG_DARK := Color("140F0D")
-const PANEL_BG := Color("201814")
+const PANEL_BG := Color("1D1512", 0.86)
 const CARD_BG := Color("2B201B")
 const CARD_HOVER := Color("3A2B23")
 const GOLD_ACCENT := Color("DFB14B")
@@ -34,6 +34,24 @@ static func card_pattern(tier: int) -> Texture2D:
 	if _icon_cache.has(key):
 		return _icon_cache[key]
 	var tex: Texture2D = load("res://assets/svg/card_pattern_t%d.svg" % clampi(tier, 1, 3))
+	_icon_cache[key] = tex
+	return tex
+
+static func table_bg() -> Texture2D:
+	if _icon_cache.has("_table_bg"):
+		return _icon_cache["_table_bg"]
+	var tex: Texture2D = load("res://assets/art/table_bg.jpg")
+	_icon_cache["_table_bg"] = tex
+	return tex
+
+static func card_art(gem: String) -> Texture2D:
+	var key := "_art_%s" % gem
+	if _icon_cache.has(key):
+		return _icon_cache[key]
+	var path := "res://assets/art/card_art_%s.jpg" % gem
+	if not ResourceLoader.exists(path):
+		return null
+	var tex: Texture2D = load(path)
 	_icon_cache[key] = tex
 	return tex
 

@@ -14,7 +14,10 @@ var interactive: bool = true
 
 var _built: bool = false
 var _is_res_mode: bool = false
+var _art_rect: TextureRect
+var _art_scrim: ColorRect
 var _pattern_rect: TextureRect
+var _hover_tw: Tween
 var _root: VBoxContainer
 var _empty_lbl: Label
 var _seal: PanelContainer
@@ -50,6 +53,19 @@ func _ensure_built(is_res: bool) -> void:
 	_empty_lbl.add_theme_color_override("font_color", Color("5B4D42"))
 	_empty_lbl.visible = false
 	add_child(_empty_lbl)
+
+	_art_rect = TextureRect.new()
+	_art_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_art_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_art_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_art_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_art_rect)
+
+	_art_scrim = ColorRect.new()
+	_art_scrim.color = Color(0.08, 0.05, 0.04, 0.56)
+	_art_scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_art_scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_art_scrim)
 
 	_pattern_rect = TextureRect.new()
 	_pattern_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -169,13 +185,18 @@ func setup_reserved_card(p_card: CardData.CraftCard, p_res_idx: int, viewer: Pla
 
 func _apply_data(viewer: PlayerState) -> void:
 	if card == null:
+		_art_rect.visible = false
+		_art_scrim.visible = false
 		_pattern_rect.visible = false
 		_root.visible = false
 		_empty_lbl.visible = true
 		tooltip_text = ""
-		add_theme_stylebox_override("panel", UITheme.make_panel_style(Color("1B1411"), Color("382C25"), 8, 1, 2))
+		add_theme_stylebox_override("panel", UITheme.make_panel_style(Color("1B1411", 0.7), Color("382C25"), 8, 1, 2))
 		return
 
+	_art_rect.visible = true
+	_art_rect.texture = UITheme.card_art(card.bonus)
+	_art_scrim.visible = true
 	_pattern_rect.visible = true
 	_pattern_rect.texture = UITheme.card_pattern(card.tier)
 	_root.visible = true
@@ -230,11 +251,26 @@ func _apply_data(viewer: PlayerState) -> void:
 func _on_hover_enter() -> void:
 	if card == null:
 		return
+	z_index = 10
+	pivot_offset = size * 0.5
 	var border_col := UITheme.AFFORD_GREEN if (is_affordable and interactive) else UITheme.GOLD_ACCENT
-	add_theme_stylebox_override("panel", UITheme.make_panel_style(UITheme.tier_bg_color(card.tier).lightened(0.08), border_col, 10, 2, 8))
+	add_theme_stylebox_override("panel", UITheme.make_panel_style(UITheme.tier_bg_color(card.tier).lightened(0.08), border_col, 10, 2, 10))
+	_art_scrim.color = Color(0.08, 0.05, 0.04, 0.40)
+	if float(Settings.get_value("anim_speed")) > 0.01:
+		if _hover_tw != null and _hover_tw.is_running():
+			_hover_tw.kill()
+		_hover_tw = create_tween()
+		_hover_tw.tween_property(self, "scale", Vector2(1.035, 1.035), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 func _on_hover_exit() -> void:
 	if card == null:
 		return
+	z_index = 0
 	var border_col := UITheme.AFFORD_GREEN if (is_affordable and interactive) else UITheme.GOLD_DIM
 	add_theme_stylebox_override("panel", UITheme.make_panel_style(UITheme.tier_bg_color(card.tier), border_col, 10, 2 if is_affordable else 1, 6))
+	_art_scrim.color = Color(0.08, 0.05, 0.04, 0.56)
+	if float(Settings.get_value("anim_speed")) > 0.01:
+		if _hover_tw != null and _hover_tw.is_running():
+			_hover_tw.kill()
+		_hover_tw = create_tween()
+		_hover_tw.tween_property(self, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)

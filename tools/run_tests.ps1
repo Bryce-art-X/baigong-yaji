@@ -7,11 +7,17 @@ $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
 Write-Host "== [1/3] Import & class cache ==" -ForegroundColor Cyan
-godot --headless --import --path $root *> $null
-if ($LASTEXITCODE -ne 0) { Write-Host "Import failed" -ForegroundColor Red; exit 1 }
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+godot --headless --import --path $root 2>&1 | Out-Null
+$impCode = $LASTEXITCODE
+$ErrorActionPreference = $prevEAP
+if ($impCode -ne 0) { Write-Host "Import failed" -ForegroundColor Red; exit 1 }
 
 Write-Host "== [2/3] Main scene load check ==" -ForegroundColor Cyan
+$ErrorActionPreference = "Continue"
 $out = godot --headless --quit --path $root 2>&1 | Out-String
+$ErrorActionPreference = $prevEAP
 if ($out -match "SCRIPT ERROR|Parse Error|Failed to load") {
     Write-Host $out -ForegroundColor Red; exit 1
 }

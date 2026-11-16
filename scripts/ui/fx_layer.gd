@@ -108,3 +108,27 @@ func pulse_control(ctrl: Control) -> void:
 	ctrl.scale = Vector2(0.86, 0.86)
 	var tw := create_tween()
 	tw.tween_property(ctrl, "scale", Vector2.ONE, 0.24 * sc).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func burst_gold(at_global: Vector2, count: int = 18) -> void:
+	var sc := _speed_scale()
+	if sc <= 0.0:
+		return
+	var p := CPUParticles2D.new()
+	p.global_position = at_global
+	p.emitting = true
+	p.one_shot = true
+	p.explosiveness = 0.92
+	p.amount = count
+	p.lifetime = 0.65 * sc
+	p.spread = 180.0
+	p.gravity = Vector2(0, 140)
+	p.initial_velocity_min = 90.0
+	p.initial_velocity_max = 210.0
+	p.scale_amount_min = 3.0
+	p.scale_amount_max = 6.5
+	p.color = UITheme.GOLD_ACCENT
+	add_child(p)
+	get_tree().create_timer(0.8 * sc).timeout.connect(func() -> void:
+		if is_instance_valid(p):
+			p.queue_free()
+	)
