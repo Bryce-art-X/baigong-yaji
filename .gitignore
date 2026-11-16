@@ -1,0 +1,22 @@
+# Godot 4 cache
+.godot/
+/android/
+
+# Build outputs
+/build/
+*.apk
+*.aab
+
+# Tool outputs (snapshots, balance reports)
+/tools/out/
+
+# Secrets
+*.keystore
+*.jks
+.env
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.tmp
+.vscode/
