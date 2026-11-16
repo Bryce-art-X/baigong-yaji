@@ -6,33 +6,33 @@ extends SceneTree
 
 const GEMS: Array[String] = ["jade", "porcelain", "bamboo", "cinnabar", "ink"]
 
-# Each entry: [prestige, {offset_from_bonus: amount}]
-# Offset 0 = same color as bonus, 1 = next color, ..., 4 = previous color.
+# Classic Splendor 90-card distribution (exact 5-way cyclic symmetry).
+# Offset 0 = same color as bonus, 1..4 = cyclic offsets.
 const TIER1_TEMPLATES: Array = [
-	[0, {1: 1, 2: 1, 3: 1, 4: 1}],  # 4 colors x1 (4)
-	[0, {1: 2, 3: 2}],              # 2 colors x2 (4)
-	[0, {1: 1, 2: 2, 4: 1}],        # 3 colors (4)
-	[0, {2: 2, 4: 1}],              # 2 colors (3)
-	[0, {3: 3}],                    # 1 color x3 (3)
-	[0, {0: 2, 1: 1, 4: 2}],        # includes own color (5)
-	[0, {1: 1, 2: 1, 3: 2, 4: 1}],  # 4 colors (5)
-	[1, {2: 3, 4: 2}],              # 1pt dual-color (5)
+	[0, {1: 1, 2: 1, 3: 1, 4: 1}],  # 1,1,1,1
+	[0, {1: 1, 2: 1, 3: 2, 4: 1}],  # 1,1,2,1
+	[0, {1: 2, 2: 2}],              # 2,2
+	[0, {1: 2, 4: 1}],              # 2,1
+	[0, {1: 3}],                    # 3
+	[0, {0: 1, 1: 3, 2: 1}],        # 1,3,1 (incl. own)
+	[0, {3: 2, 4: 1}],              # 2,1
+	[1, {2: 4}],                    # 4 (1pt)
 ]
 
 const TIER2_TEMPLATES: Array = [
-	[1, {1: 2, 2: 2, 3: 2}],        # 3 colors (6)
-	[1, {0: 3, 2: 2, 4: 2}],        # includes own (7)
-	[2, {1: 4, 3: 2, 4: 1}],        # 3 colors (7)
-	[2, {2: 5}],                    # mono-5 (5)
-	[2, {1: 3, 4: 4}],              # dual-color (7)
-	[3, {0: 5, 3: 2}],              # 3pt dual-color (7)
+	[1, {1: 2, 2: 2, 3: 3}],        # 2,2,3 (1pt)
+	[1, {0: 2, 2: 3, 4: 3}],        # 2,3,3 (1pt, incl. own)
+	[2, {1: 1, 2: 4, 3: 2}],        # 1,4,2 (2pt)
+	[2, {3: 3, 4: 5}],              # 3,5 (2pt)
+	[2, {1: 5}],                    # 5 (2pt)
+	[3, {0: 6}],                    # 6 own (3pt)
 ]
 
 const TIER3_TEMPLATES: Array = [
-	[3, {1: 3, 2: 3, 3: 4, 4: 3}],  # 4 colors (13)
-	[4, {4: 6, 1: 2}],              # heavy + splash (8)
-	[4, {0: 3, 2: 5, 3: 3}],        # 3 colors (11)
-	[5, {0: 3, 4: 6, 1: 2}],        # 5pt flagship (11)
+	[3, {1: 3, 2: 3, 3: 5, 4: 3}],  # 3,3,5,3 (3pt)
+	[4, {4: 7}],                    # 7 (4pt)
+	[4, {0: 3, 3: 3, 4: 6}],        # 3,6,3 (4pt)
+	[5, {0: 3, 4: 7}],              # 3,7 (5pt)
 ]
 
 func _init() -> void:

@@ -1,5 +1,11 @@
 # 更新日志
 
+## [1.1.0] - 2026-11-16 · 经典数值回归与开源视听升级
+- **恢复 100% 原版《璀璨宝石》经典 90 张卡数值曲线**（保留原创国风器物命名与名士题材）。
+- **接入开源 3D 卡牌透视 + 鎏金扫光 Shader**：基于 `codevogel/faux-3d-perspective-shader-godot`（MIT），鼠标悬停实时 3D 倾斜与高光扫掠。
+- **接入 Kenney CC0 真实桌游音效**：引入 `cardPlace1.ogg`、`cardSlide1.ogg`、`chipLay1.ogg`、`chipsCollide1.ogg` 替换基础合成音。
+- **桌面环境烛光水墨暗角 Shader**（`table_vignette.gdshader`）与五材工笔插画。
+
 ## [1.0.0] - 2026-11-16 · P8 正式版收官与多平台导出预设
 - 新增 `export_presets.cfg`，预设 **Windows Desktop**、**Web (HTML5)** 与 **Android** 三端导出配置（排除 `tests/` 与 `tools/`，内嵌 PCK）。
 - 新增 `docs/RELEASE_CHECKLIST.md` 发布验收清单与一键导出命令。

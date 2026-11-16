@@ -16,8 +16,10 @@
     {
       "bonus": "jade",
       "cost": {
+        "bamboo": 1,
         "cinnabar": 2,
-        "porcelain": 2
+        "ink": 1,
+        "porcelain": 1
       },
       "id": "t1_02",
       "name": "玉兔镇纸",
@@ -28,8 +30,7 @@
       "bonus": "jade",
       "cost": {
         "bamboo": 2,
-        "ink": 1,
-        "porcelain": 1
+        "porcelain": 2
       },
       "id": "t1_03",
       "name": "羊脂鼻烟壶",
@@ -39,8 +40,8 @@
     {
       "bonus": "jade",
       "cost": {
-        "bamboo": 2,
-        "ink": 1
+        "ink": 1,
+        "porcelain": 2
       },
       "id": "t1_04",
       "name": "白玉发簪",
@@ -50,7 +51,7 @@
     {
       "bonus": "jade",
       "cost": {
-        "cinnabar": 3
+        "porcelain": 3
       },
       "id": "t1_05",
       "name": "琢玉印章",
@@ -60,9 +61,9 @@
     {
       "bonus": "jade",
       "cost": {
-        "ink": 2,
-        "jade": 2,
-        "porcelain": 1
+        "bamboo": 1,
+        "jade": 1,
+        "porcelain": 3
       },
       "id": "t1_06",
       "name": "冰裂茶托",
@@ -72,10 +73,8 @@
     {
       "bonus": "jade",
       "cost": {
-        "bamboo": 1,
         "cinnabar": 2,
-        "ink": 1,
-        "porcelain": 1
+        "ink": 1
       },
       "id": "t1_07",
       "name": "素玉扳指",
@@ -85,8 +84,7 @@
     {
       "bonus": "jade",
       "cost": {
-        "bamboo": 3,
-        "ink": 2
+        "bamboo": 4
       },
       "id": "t1_08",
       "name": "云纹玉珮",
@@ -109,8 +107,10 @@
     {
       "bonus": "porcelain",
       "cost": {
-        "bamboo": 2,
-        "ink": 2
+        "bamboo": 1,
+        "cinnabar": 1,
+        "ink": 2,
+        "jade": 1
       },
       "id": "t1_10",
       "name": "影青香碟",
@@ -120,9 +120,8 @@
     {
       "bonus": "porcelain",
       "cost": {
-        "bamboo": 1,
-        "cinnabar": 2,
-        "jade": 1
+        "bamboo": 2,
+        "cinnabar": 2
       },
       "id": "t1_11",
       "name": "莲瓣笔洗",
@@ -132,7 +131,7 @@
     {
       "bonus": "porcelain",
       "cost": {
-        "cinnabar": 2,
+        "bamboo": 2,
         "jade": 1
       },
       "id": "t1_12",
@@ -143,7 +142,7 @@
     {
       "bonus": "porcelain",
       "cost": {
-        "ink": 3
+        "bamboo": 3
       },
       "id": "t1_13",
       "name": "天青小碗",
@@ -153,9 +152,9 @@
     {
       "bonus": "porcelain",
       "cost": {
-        "bamboo": 1,
-        "jade": 2,
-        "porcelain": 2
+        "bamboo": 3,
+        "cinnabar": 1,
+        "porcelain": 1
       },
       "id": "t1_14",
       "name": "青花调羹",
@@ -165,8 +164,6 @@
     {
       "bonus": "porcelain",
       "cost": {
-        "bamboo": 1,
-        "cinnabar": 1,
         "ink": 2,
         "jade": 1
       },
@@ -178,8 +175,7 @@
     {
       "bonus": "porcelain",
       "cost": {
-        "cinnabar": 3,
-        "jade": 2
+        "cinnabar": 4
       },
       "id": "t1_16",
       "name": "秘色莲花尊",
@@ -202,8 +198,10 @@
     {
       "bonus": "bamboo",
       "cost": {
-        "cinnabar": 2,
-        "jade": 2
+        "cinnabar": 1,
+        "ink": 1,
+        "jade": 2,
+        "porcelain": 1
       },
       "id": "t1_18",
       "name": "竹雕臂搁",
@@ -213,9 +211,8 @@
     {
       "bonus": "bamboo",
       "cost": {
-        "cinnabar": 1,
-        "ink": 2,
-        "porcelain": 1
+        "cinnabar": 2,
+        "ink": 2
       },
       "id": "t1_19",
       "name": "编竹茶笼",
@@ -225,7 +222,7 @@
     {
       "bonus": "bamboo",
       "cost": {
-        "ink": 2,
+        "cinnabar": 2,
         "porcelain": 1
       },
       "id": "t1_20",
@@ -236,7 +233,7 @@
     {
       "bonus": "bamboo",
       "cost": {
-        "jade": 3
+        "cinnabar": 3
       },
       "id": "t1_21",
       "name": "青竹茶则",
@@ -246,9 +243,9 @@
     {
       "bonus": "bamboo",
       "cost": {
-        "bamboo": 2,
-        "cinnabar": 1,
-        "porcelain": 2
+        "bamboo": 1,
+        "cinnabar": 3,
+        "ink": 1
       },
       "id": "t1_22",
       "name": "竹根香筒",
@@ -258,8 +255,6 @@
     {
       "bonus": "bamboo",
       "cost": {
-        "cinnabar": 1,
-        "ink": 1,
         "jade": 2,
         "porcelain": 1
       },
@@ -271,8 +266,7 @@
     {
       "bonus": "bamboo",
       "cost": {
-        "ink": 3,
-        "porcelain": 2
+        "ink": 4
       },
       "id": "t1_24",
       "name": "七贤竹雕",
@@ -295,7 +289,9 @@
     {
       "bonus": "cinnabar",
       "cost": {
-        "ink": 2,
+        "bamboo": 1,
+        "ink": 1,
+        "jade": 1,
         "porcelain": 2
       },
       "id": "t1_26",
@@ -306,8 +302,7 @@
     {
       "bonus": "cinnabar",
       "cost": {
-        "bamboo": 1,
-        "ink": 1,
+        "ink": 2,
         "jade": 2
       },
       "id": "t1_27",
@@ -319,7 +314,7 @@
       "bonus": "cinnabar",
       "cost": {
         "bamboo": 1,
-        "jade": 2
+        "ink": 2
       },
       "id": "t1_28",
       "name": "赤漆茶盘",
@@ -329,7 +324,7 @@
     {
       "bonus": "cinnabar",
       "cost": {
-        "porcelain": 3
+        "ink": 3
       },
       "id": "t1_29",
       "name": "朱漆木梳",
@@ -339,9 +334,9 @@
     {
       "bonus": "cinnabar",
       "cost": {
-        "bamboo": 2,
-        "cinnabar": 2,
-        "ink": 1
+        "cinnabar": 1,
+        "ink": 3,
+        "jade": 1
       },
       "id": "t1_30",
       "name": "玛瑙荷叶杯",
@@ -352,8 +347,6 @@
       "bonus": "cinnabar",
       "cost": {
         "bamboo": 1,
-        "ink": 1,
-        "jade": 1,
         "porcelain": 2
       },
       "id": "t1_31",
@@ -364,8 +357,7 @@
     {
       "bonus": "cinnabar",
       "cost": {
-        "bamboo": 2,
-        "jade": 3
+        "jade": 4
       },
       "id": "t1_32",
       "name": "雕漆牡丹盘",
@@ -389,7 +381,9 @@
       "bonus": "ink",
       "cost": {
         "bamboo": 2,
-        "jade": 2
+        "cinnabar": 1,
+        "jade": 1,
+        "porcelain": 1
       },
       "id": "t1_34",
       "name": "乌木算盘",
@@ -399,8 +393,7 @@
     {
       "bonus": "ink",
       "cost": {
-        "cinnabar": 1,
-        "jade": 1,
+        "jade": 2,
         "porcelain": 2
       },
       "id": "t1_35",
@@ -412,7 +405,7 @@
       "bonus": "ink",
       "cost": {
         "cinnabar": 1,
-        "porcelain": 2
+        "jade": 2
       },
       "id": "t1_36",
       "name": "紫檀镇尺",
@@ -422,7 +415,7 @@
     {
       "bonus": "ink",
       "cost": {
-        "bamboo": 3
+        "jade": 3
       },
       "id": "t1_37",
       "name": "黑陶茶壶",
@@ -432,9 +425,9 @@
     {
       "bonus": "ink",
       "cost": {
-        "cinnabar": 2,
-        "ink": 2,
-        "jade": 1
+        "ink": 1,
+        "jade": 3,
+        "porcelain": 1
       },
       "id": "t1_38",
       "name": "螺钿墨盒",
@@ -445,9 +438,7 @@
       "bonus": "ink",
       "cost": {
         "bamboo": 2,
-        "cinnabar": 1,
-        "jade": 1,
-        "porcelain": 1
+        "cinnabar": 1
       },
       "id": "t1_39",
       "name": "铁画屏风",
@@ -457,8 +448,7 @@
     {
       "bonus": "ink",
       "cost": {
-        "cinnabar": 2,
-        "porcelain": 3
+        "porcelain": 4
       },
       "id": "t1_40",
       "name": "御墨龙纹锭",
@@ -469,7 +459,7 @@
       "bonus": "jade",
       "cost": {
         "bamboo": 2,
-        "cinnabar": 2,
+        "cinnabar": 3,
         "porcelain": 2
       },
       "id": "t2_01",
@@ -480,9 +470,9 @@
     {
       "bonus": "jade",
       "cost": {
-        "bamboo": 2,
-        "ink": 2,
-        "jade": 3
+        "bamboo": 3,
+        "ink": 3,
+        "jade": 2
       },
       "id": "t2_02",
       "name": "双耳玉壶",
@@ -492,9 +482,9 @@
     {
       "bonus": "jade",
       "cost": {
+        "bamboo": 4,
         "cinnabar": 2,
-        "ink": 1,
-        "porcelain": 4
+        "porcelain": 1
       },
       "id": "t2_03",
       "name": "翡翠白菜",
@@ -504,7 +494,8 @@
     {
       "bonus": "jade",
       "cost": {
-        "bamboo": 5
+        "cinnabar": 3,
+        "ink": 5
       },
       "id": "t2_04",
       "name": "白玉香炉",
@@ -514,8 +505,7 @@
     {
       "bonus": "jade",
       "cost": {
-        "ink": 4,
-        "porcelain": 3
+        "porcelain": 5
       },
       "id": "t2_05",
       "name": "雕玉笔架",
@@ -525,8 +515,7 @@
     {
       "bonus": "jade",
       "cost": {
-        "cinnabar": 2,
-        "jade": 5
+        "jade": 6
       },
       "id": "t2_06",
       "name": "连理玉屏",
@@ -538,7 +527,7 @@
       "cost": {
         "bamboo": 2,
         "cinnabar": 2,
-        "ink": 2
+        "ink": 3
       },
       "id": "t2_07",
       "name": "青花梅瓶",
@@ -548,9 +537,9 @@
     {
       "bonus": "porcelain",
       "cost": {
-        "cinnabar": 2,
-        "jade": 2,
-        "porcelain": 3
+        "cinnabar": 3,
+        "jade": 3,
+        "porcelain": 2
       },
       "id": "t2_08",
       "name": "汝窑弦纹尊",
@@ -560,9 +549,9 @@
     {
       "bonus": "porcelain",
       "cost": {
-        "bamboo": 4,
-        "ink": 2,
-        "jade": 1
+        "bamboo": 1,
+        "cinnabar": 4,
+        "ink": 2
       },
       "id": "t2_09",
       "name": "斗彩鸡缸杯",
@@ -572,7 +561,8 @@
     {
       "bonus": "porcelain",
       "cost": {
-        "cinnabar": 5
+        "ink": 3,
+        "jade": 5
       },
       "id": "t2_10",
       "name": "钧窑鼓钉洗",
@@ -582,8 +572,7 @@
     {
       "bonus": "porcelain",
       "cost": {
-        "bamboo": 3,
-        "jade": 4
+        "bamboo": 5
       },
       "id": "t2_11",
       "name": "哥窑贯耳瓶",
@@ -593,8 +582,7 @@
     {
       "bonus": "porcelain",
       "cost": {
-        "ink": 2,
-        "porcelain": 5
+        "porcelain": 6
       },
       "id": "t2_12",
       "name": "官窑龙泉瓶",
@@ -606,7 +594,7 @@
       "cost": {
         "cinnabar": 2,
         "ink": 2,
-        "jade": 2
+        "jade": 3
       },
       "id": "t2_13",
       "name": "竹簧嵌画盒",
@@ -616,9 +604,9 @@
     {
       "bonus": "bamboo",
       "cost": {
-        "bamboo": 3,
-        "ink": 2,
-        "porcelain": 2
+        "bamboo": 2,
+        "ink": 3,
+        "porcelain": 3
       },
       "id": "t2_14",
       "name": "镂空竹薰炉",
@@ -628,9 +616,9 @@
     {
       "bonus": "bamboo",
       "cost": {
-        "cinnabar": 4,
-        "jade": 2,
-        "porcelain": 1
+        "cinnabar": 1,
+        "ink": 4,
+        "jade": 2
       },
       "id": "t2_15",
       "name": "竹刻松鹤图",
@@ -640,7 +628,8 @@
     {
       "bonus": "bamboo",
       "cost": {
-        "ink": 5
+        "jade": 3,
+        "porcelain": 5
       },
       "id": "t2_16",
       "name": "湘竹多宝格",
@@ -650,8 +639,7 @@
     {
       "bonus": "bamboo",
       "cost": {
-        "cinnabar": 3,
-        "porcelain": 4
+        "cinnabar": 5
       },
       "id": "t2_17",
       "name": "紫竹洞箫",
@@ -661,8 +649,7 @@
     {
       "bonus": "bamboo",
       "cost": {
-        "bamboo": 5,
-        "jade": 2
+        "bamboo": 6
       },
       "id": "t2_18",
       "name": "九节文竹琴",
@@ -674,7 +661,7 @@
       "cost": {
         "ink": 2,
         "jade": 2,
-        "porcelain": 2
+        "porcelain": 3
       },
       "id": "t2_19",
       "name": "剔红游春盒",
@@ -684,9 +671,9 @@
     {
       "bonus": "cinnabar",
       "cost": {
-        "bamboo": 2,
-        "cinnabar": 3,
-        "jade": 2
+        "bamboo": 3,
+        "cinnabar": 2,
+        "jade": 3
       },
       "id": "t2_20",
       "name": "朱砂钟馗画",
@@ -696,8 +683,8 @@
     {
       "bonus": "cinnabar",
       "cost": {
-        "bamboo": 1,
-        "ink": 4,
+        "ink": 1,
+        "jade": 4,
         "porcelain": 2
       },
       "id": "t2_21",
@@ -708,7 +695,8 @@
     {
       "bonus": "cinnabar",
       "cost": {
-        "jade": 5
+        "bamboo": 5,
+        "porcelain": 3
       },
       "id": "t2_22",
       "name": "苏绣百鸟衣",
@@ -718,8 +706,7 @@
     {
       "bonus": "cinnabar",
       "cost": {
-        "bamboo": 4,
-        "ink": 3
+        "ink": 5
       },
       "id": "t2_23",
       "name": "朱漆描金匣",
@@ -729,8 +716,7 @@
     {
       "bonus": "cinnabar",
       "cost": {
-        "cinnabar": 5,
-        "porcelain": 2
+        "cinnabar": 6
       },
       "id": "t2_24",
       "name": "云锦龙纹袍",
@@ -740,7 +726,7 @@
     {
       "bonus": "ink",
       "cost": {
-        "bamboo": 2,
+        "bamboo": 3,
         "jade": 2,
         "porcelain": 2
       },
@@ -752,9 +738,9 @@
     {
       "bonus": "ink",
       "cost": {
-        "cinnabar": 2,
-        "ink": 3,
-        "porcelain": 2
+        "cinnabar": 3,
+        "ink": 2,
+        "porcelain": 3
       },
       "id": "t2_26",
       "name": "紫檀嵌螺钿",
@@ -765,8 +751,8 @@
       "bonus": "ink",
       "cost": {
         "bamboo": 2,
-        "cinnabar": 1,
-        "jade": 4
+        "jade": 1,
+        "porcelain": 4
       },
       "id": "t2_27",
       "name": "澄泥虎符砚",
@@ -776,7 +762,8 @@
     {
       "bonus": "ink",
       "cost": {
-        "porcelain": 5
+        "bamboo": 3,
+        "cinnabar": 5
       },
       "id": "t2_28",
       "name": "玄铁错金剑",
@@ -786,8 +773,7 @@
     {
       "bonus": "ink",
       "cost": {
-        "cinnabar": 4,
-        "jade": 3
+        "jade": 5
       },
       "id": "t2_29",
       "name": "乌木围棋笥",
@@ -797,8 +783,7 @@
     {
       "bonus": "ink",
       "cost": {
-        "bamboo": 2,
-        "ink": 5
+        "ink": 6
       },
       "id": "t2_30",
       "name": "歙砚九龙池",
@@ -809,7 +794,7 @@
       "bonus": "jade",
       "cost": {
         "bamboo": 3,
-        "cinnabar": 4,
+        "cinnabar": 5,
         "ink": 3,
         "porcelain": 3
       },
@@ -821,8 +806,7 @@
     {
       "bonus": "jade",
       "cost": {
-        "ink": 6,
-        "porcelain": 2
+        "ink": 7
       },
       "id": "t3_02",
       "name": "大禹治水玉山",
@@ -832,8 +816,8 @@
     {
       "bonus": "jade",
       "cost": {
-        "bamboo": 5,
         "cinnabar": 3,
+        "ink": 6,
         "jade": 3
       },
       "id": "t3_03",
@@ -844,9 +828,8 @@
     {
       "bonus": "jade",
       "cost": {
-        "ink": 6,
-        "jade": 3,
-        "porcelain": 2
+        "ink": 7,
+        "jade": 3
       },
       "id": "t3_04",
       "name": "和氏璧",
@@ -858,7 +841,7 @@
       "cost": {
         "bamboo": 3,
         "cinnabar": 3,
-        "ink": 4,
+        "ink": 5,
         "jade": 3
       },
       "id": "t3_05",
@@ -869,8 +852,7 @@
     {
       "bonus": "porcelain",
       "cost": {
-        "bamboo": 2,
-        "jade": 6
+        "jade": 7
       },
       "id": "t3_06",
       "name": "景泰蓝百兽尊",
@@ -880,8 +862,8 @@
     {
       "bonus": "porcelain",
       "cost": {
-        "cinnabar": 5,
         "ink": 3,
+        "jade": 6,
         "porcelain": 3
       },
       "id": "t3_07",
@@ -892,8 +874,7 @@
     {
       "bonus": "porcelain",
       "cost": {
-        "bamboo": 2,
-        "jade": 6,
+        "jade": 7,
         "porcelain": 3
       },
       "id": "t3_08",
@@ -906,7 +887,7 @@
       "cost": {
         "cinnabar": 3,
         "ink": 3,
-        "jade": 4,
+        "jade": 5,
         "porcelain": 3
       },
       "id": "t3_09",
@@ -917,8 +898,7 @@
     {
       "bonus": "bamboo",
       "cost": {
-        "cinnabar": 2,
-        "porcelain": 6
+        "porcelain": 7
       },
       "id": "t3_10",
       "name": "千里江山长卷",
@@ -929,8 +909,8 @@
       "bonus": "bamboo",
       "cost": {
         "bamboo": 3,
-        "ink": 5,
-        "jade": 3
+        "jade": 3,
+        "porcelain": 6
       },
       "id": "t3_11",
       "name": "清明上河图卷",
@@ -941,8 +921,7 @@
       "bonus": "bamboo",
       "cost": {
         "bamboo": 3,
-        "cinnabar": 2,
-        "porcelain": 6
+        "porcelain": 7
       },
       "id": "t3_12",
       "name": "兰亭集序帖",
@@ -955,7 +934,7 @@
         "bamboo": 3,
         "ink": 3,
         "jade": 3,
-        "porcelain": 4
+        "porcelain": 5
       },
       "id": "t3_13",
       "name": "剔红九龙宝座",
@@ -965,8 +944,7 @@
     {
       "bonus": "cinnabar",
       "cost": {
-        "bamboo": 6,
-        "ink": 2
+        "bamboo": 7
       },
       "id": "t3_14",
       "name": "金漆百鸟朝凤",
@@ -976,8 +954,8 @@
     {
       "bonus": "cinnabar",
       "cost": {
+        "bamboo": 6,
         "cinnabar": 3,
-        "jade": 5,
         "porcelain": 3
       },
       "id": "t3_15",
@@ -988,9 +966,8 @@
     {
       "bonus": "cinnabar",
       "cost": {
-        "bamboo": 6,
-        "cinnabar": 3,
-        "ink": 2
+        "bamboo": 7,
+        "cinnabar": 3
       },
       "id": "t3_16",
       "name": "赤金凤冠",
@@ -1000,7 +977,7 @@
     {
       "bonus": "ink",
       "cost": {
-        "bamboo": 4,
+        "bamboo": 5,
         "cinnabar": 3,
         "jade": 3,
         "porcelain": 3
@@ -1013,8 +990,7 @@
     {
       "bonus": "ink",
       "cost": {
-        "cinnabar": 6,
-        "jade": 2
+        "cinnabar": 7
       },
       "id": "t3_18",
       "name": "九霄环佩古琴",
@@ -1025,8 +1001,8 @@
       "bonus": "ink",
       "cost": {
         "bamboo": 3,
-        "ink": 3,
-        "porcelain": 5
+        "cinnabar": 6,
+        "ink": 3
       },
       "id": "t3_19",
       "name": "司母戊大方鼎",
@@ -1036,9 +1012,8 @@
     {
       "bonus": "ink",
       "cost": {
-        "cinnabar": 6,
-        "ink": 3,
-        "jade": 2
+        "cinnabar": 7,
+        "ink": 3
       },
       "id": "t3_20",
       "name": "永乐大典残卷",

@@ -31,6 +31,11 @@ func _build_ui() -> void:
 	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var vig_sh: Shader = load("res://assets/shaders/table_vignette.gdshader")
+	if vig_sh != null:
+		var mat := ShaderMaterial.new()
+		mat.shader = vig_sh
+		bg.material = mat
 	add_child(bg)
 
 	var scrim := ColorRect.new()

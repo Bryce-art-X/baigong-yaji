@@ -14,7 +14,9 @@ var interactive: bool = true
 
 var _built: bool = false
 var _is_res_mode: bool = false
+var _is_hovered: bool = false
 var _art_rect: TextureRect
+var _art_mat: ShaderMaterial
 var _art_scrim: ColorRect
 var _pattern_rect: TextureRect
 var _hover_tw: Tween
@@ -59,6 +61,11 @@ func _ensure_built(is_res: bool) -> void:
 	_art_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_art_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	_art_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sh: Shader = load("res://assets/shaders/card_3d_foil.gdshader")
+	if sh != null:
+		_art_mat = ShaderMaterial.new()
+		_art_mat.shader = sh
+		_art_rect.material = _art_mat
 	add_child(_art_rect)
 
 	_art_scrim = ColorRect.new()
@@ -196,6 +203,8 @@ func _apply_data(viewer: PlayerState) -> void:
 
 	_art_rect.visible = true
 	_art_rect.texture = UITheme.card_art(card.bonus)
+	if _art_mat != null:
+		_art_mat.set_shader_parameter("foil_strength", 0.32 if (is_affordable and interactive) else 0.0)
 	_art_scrim.visible = true
 	_pattern_rect.visible = true
 	_pattern_rect.texture = UITheme.card_pattern(card.tier)
@@ -248,14 +257,29 @@ func _apply_data(viewer: PlayerState) -> void:
 		_res_btn.disabled = not (can_reserve and interactive)
 		UITheme.style_button(_res_btn, Color("473522"), UITheme.GOLD_DIM)
 
+func _gui_input(event: InputEvent) -> void:
+	if not _is_hovered or card == null or _art_mat == null:
+		return
+	if float(Settings.get_value("anim_speed")) <= 0.01:
+		return
+	if event is InputEventMouseMotion:
+		var nx := clampf(event.position.x / maxf(1.0, size.x), 0.0, 1.0)
+		var ny := clampf(event.position.y / maxf(1.0, size.y), 0.0, 1.0)
+		_art_mat.set_shader_parameter("mouse_norm", Vector2(nx, ny))
+		_art_mat.set_shader_parameter("rot_y_deg", (nx - 0.5) * 14.0)
+		_art_mat.set_shader_parameter("rot_x_deg", -(ny - 0.5) * 14.0)
+
 func _on_hover_enter() -> void:
 	if card == null:
 		return
+	_is_hovered = true
 	z_index = 10
 	pivot_offset = size * 0.5
 	var border_col := UITheme.AFFORD_GREEN if (is_affordable and interactive) else UITheme.GOLD_ACCENT
 	add_theme_stylebox_override("panel", UITheme.make_panel_style(UITheme.tier_bg_color(card.tier).lightened(0.08), border_col, 10, 2, 10))
-	_art_scrim.color = Color(0.08, 0.05, 0.04, 0.40)
+	_art_scrim.color = Color(0.08, 0.05, 0.04, 0.36)
+	if _art_mat != null:
+		_art_mat.set_shader_parameter("foil_strength", 0.75 if is_affordable else 0.45)
 	if float(Settings.get_value("anim_speed")) > 0.01:
 		if _hover_tw != null and _hover_tw.is_running():
 			_hover_tw.kill()
@@ -265,10 +289,15 @@ func _on_hover_enter() -> void:
 func _on_hover_exit() -> void:
 	if card == null:
 		return
+	_is_hovered = false
 	z_index = 0
 	var border_col := UITheme.AFFORD_GREEN if (is_affordable and interactive) else UITheme.GOLD_DIM
 	add_theme_stylebox_override("panel", UITheme.make_panel_style(UITheme.tier_bg_color(card.tier), border_col, 10, 2 if is_affordable else 1, 6))
 	_art_scrim.color = Color(0.08, 0.05, 0.04, 0.56)
+	if _art_mat != null:
+		_art_mat.set_shader_parameter("rot_x_deg", 0.0)
+		_art_mat.set_shader_parameter("rot_y_deg", 0.0)
+		_art_mat.set_shader_parameter("foil_strength", 0.32 if (is_affordable and interactive) else 0.0)
 	if float(Settings.get_value("anim_speed")) > 0.01:
 		if _hover_tw != null and _hover_tw.is_running():
 			_hover_tw.kill()
