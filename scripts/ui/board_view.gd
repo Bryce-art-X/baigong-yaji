@@ -11,6 +11,7 @@ var _selected_gems: Array[String] = []
 var _discard_pool: Dictionary = {}
 var _stats_recorded: bool = false
 var _is_tutorial: bool = false
+var _is_daily: bool = false
 var _tutorial_step: int = 0
 var _last_human_idx: int = -1
 var _ai_timer: Timer
@@ -51,7 +52,7 @@ func _ready() -> void:
 	add_child(_ai_timer)
 	_build_skeleton()
 
-func start_game(p_state: GameState, p_is_tutorial: bool = false) -> void:
+func start_game(p_state: GameState, p_is_tutorial: bool = false, p_is_daily: bool = false) -> void:
 	_controller = GameController.new(p_state)
 	_controller.events_applied.connect(_on_events_applied)
 	state = _controller.state
@@ -59,6 +60,7 @@ func start_game(p_state: GameState, p_is_tutorial: bool = false) -> void:
 	_discard_pool.clear()
 	_stats_recorded = false
 	_is_tutorial = p_is_tutorial
+	_is_daily = p_is_daily
 	_tutorial_step = 0
 	if _tutorial_bar != null:
 		_tutorial_bar.visible = _is_tutorial
@@ -560,6 +562,21 @@ func _refresh_all() -> void:
 		if not _stats_recorded:
 			_stats_recorded = true
 			SaveManager.record_game_result(state)
+			if _is_daily:
+				var human_won := false
+				var human_sc := 0
+				for p in state.players:
+					if not p.is_ai:
+						human_sc = maxi(human_sc, p.get_score())
+						if state.winner_indices.has(p.index):
+							human_won = true
+				SaveManager.record_daily_result(human_won, human_sc, state.round_number)
+			var newly_ach := Achievements.evaluate_game_over(state, _is_daily)
+			if not newly_ach.is_empty() and _fx != null:
+				var ach_names: Array[String] = []
+				for aid in newly_ach:
+					ach_names.append("「%s」" % Achievements.get_title(aid))
+				_fx.show_banner("解锁成就：" + " ".join(ach_names))
 			SaveManager.clear_autosave()
 			SfxManager.play_victory()
 		_show_game_over_modal()

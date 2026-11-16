@@ -4,7 +4,9 @@ extends Control
 signal start_game_requested(player_configs: Array, target_prestige: int)
 signal continue_game_requested
 signal tutorial_requested
+signal daily_requested
 signal codex_requested
+signal achievements_requested
 signal settings_requested
 
 var _player_count: int = 3
@@ -16,6 +18,7 @@ var _seats_box: VBoxContainer
 var _count_btns: Array[Button] = []
 var _target_btns: Array[Button] = []
 var _continue_btn: Button
+var _daily_btn: Button
 var _stats_lbl: Label
 
 func _ready() -> void:
@@ -147,6 +150,17 @@ func _build_ui() -> void:
 	sub_row.add_theme_constant_override("separation", 10)
 	vbox.add_child(sub_row)
 
+	_daily_btn = Button.new()
+	_daily_btn.text = "每日雅集"
+	_daily_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_daily_btn.custom_minimum_size = Vector2(0, 36)
+	UITheme.style_button(_daily_btn, Color("3A2C1D"), UITheme.GOLD_ACCENT)
+	_daily_btn.pressed.connect(func() -> void:
+		SfxManager.play_click()
+		daily_requested.emit()
+	)
+	sub_row.add_child(_daily_btn)
+
 	var tut_btn := Button.new()
 	tut_btn.text = "新手教学"
 	tut_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -159,7 +173,7 @@ func _build_ui() -> void:
 	sub_row.add_child(tut_btn)
 
 	var codex_btn := Button.new()
-	codex_btn.text = "《百工谱》图鉴"
+	codex_btn.text = "百工谱"
 	codex_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	codex_btn.custom_minimum_size = Vector2(0, 36)
 	UITheme.style_button(codex_btn)
@@ -168,6 +182,17 @@ func _build_ui() -> void:
 		codex_requested.emit()
 	)
 	sub_row.add_child(codex_btn)
+
+	var ach_btn := Button.new()
+	ach_btn.text = "成就录"
+	ach_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ach_btn.custom_minimum_size = Vector2(0, 36)
+	UITheme.style_button(ach_btn)
+	ach_btn.pressed.connect(func() -> void:
+		SfxManager.play_click()
+		achievements_requested.emit()
+	)
+	sub_row.add_child(ach_btn)
 
 	var set_btn := Button.new()
 	set_btn.text = "雅阁设置"
@@ -191,6 +216,8 @@ func _build_ui() -> void:
 func refresh_meta() -> void:
 	if _continue_btn != null:
 		_continue_btn.visible = SaveManager.has_autosave()
+	if _daily_btn != null:
+		_daily_btn.text = "每日雅集 ✓" if SaveManager.is_today_daily_won() else "每日雅集"
 	if _stats_lbl != null:
 		var st := SaveManager.load_stats()
 		var gp := int(st["games_played"])

@@ -4,6 +4,7 @@ extends RefCounted
 const AUTOSAVE_PATH := "user://autosave.json"
 const STATS_PATH := "user://stats.json"
 const CODEX_PATH := "user://codex.json"
+const DAILY_PATH := "user://daily.json"
 
 static func _card_to_dict(c: CardData.CraftCard) -> Dictionary:
 	if c == null:
@@ -237,3 +238,41 @@ static func unlock_codex_entry(kind: String, entry_id: String) -> void:
 		var f := FileAccess.open(CODEX_PATH, FileAccess.WRITE)
 		if f != null:
 			f.store_string(JSON.stringify(codex))
+
+static func today_date_key() -> String:
+	var dt := Time.get_date_dict_from_system()
+	return "%04d%02d%02d" % [int(dt["year"]), int(dt["month"]), int(dt["day"])]
+
+static func today_seed() -> int:
+	return int(today_date_key())
+
+static func is_today_daily_won() -> bool:
+	if not FileAccess.file_exists(DAILY_PATH):
+		return false
+	var f := FileAccess.open(DAILY_PATH, FileAccess.READ)
+	if f == null:
+		return false
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return false
+	return bool(parsed.get(today_date_key(), {}).get("won", false))
+
+static func record_daily_result(won: bool, score: int, rounds: int) -> void:
+	var data: Dictionary = {}
+	if FileAccess.file_exists(DAILY_PATH):
+		var f := FileAccess.open(DAILY_PATH, FileAccess.READ)
+		if f != null:
+			var parsed: Variant = JSON.parse_string(f.get_as_text())
+			if typeof(parsed) == TYPE_DICTIONARY:
+				data = parsed
+	var key := today_date_key()
+	var prev: Dictionary = data.get(key, {})
+	var prev_won := bool(prev.get("won", false))
+	data[key] = {
+		"won": prev_won or won,
+		"best_score": maxi(int(prev.get("best_score", 0)), score),
+		"best_rounds": rounds if (won and (int(prev.get("best_rounds", 999)) > rounds)) else int(prev.get("best_rounds", rounds)),
+	}
+	var fw := FileAccess.open(DAILY_PATH, FileAccess.WRITE)
+	if fw != null:
+		fw.store_string(JSON.stringify(data))
