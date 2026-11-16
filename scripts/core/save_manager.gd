@@ -3,6 +3,7 @@ extends RefCounted
 
 const AUTOSAVE_PATH := "user://autosave.json"
 const STATS_PATH := "user://stats.json"
+const CODEX_PATH := "user://codex.json"
 
 static func _card_to_dict(c: CardData.CraftCard) -> Dictionary:
 	if c == null:
@@ -208,3 +209,31 @@ static func record_game_result(state: GameState) -> void:
 	var f := FileAccess.open(STATS_PATH, FileAccess.WRITE)
 	if f != null:
 		f.store_string(JSON.stringify(stats))
+
+static func load_codex() -> Dictionary:
+	var defaults := {"cards": [], "masters": []}
+	if not FileAccess.file_exists(CODEX_PATH):
+		return defaults
+	var f := FileAccess.open(CODEX_PATH, FileAccess.READ)
+	if f == null:
+		return defaults
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return defaults
+	if not parsed.has("cards"):
+		parsed["cards"] = []
+	if not parsed.has("masters"):
+		parsed["masters"] = []
+	return parsed
+
+static func unlock_codex_entry(kind: String, entry_id: String) -> void:
+	if entry_id.is_empty():
+		return
+	var codex := load_codex()
+	var arr: Array = codex.get(kind, [])
+	if not arr.has(entry_id):
+		arr.append(entry_id)
+		codex[kind] = arr
+		var f := FileAccess.open(CODEX_PATH, FileAccess.WRITE)
+		if f != null:
+			f.store_string(JSON.stringify(codex))

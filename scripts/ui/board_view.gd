@@ -3,14 +3,20 @@ extends Control
 
 signal return_to_menu_requested
 signal restart_requested
+signal settings_requested
 
 var _controller: GameController
 var state: GameState
 var _selected_gems: Array[String] = []
 var _discard_pool: Dictionary = {}
 var _stats_recorded: bool = false
+var _is_tutorial: bool = false
+var _tutorial_step: int = 0
 var _last_human_idx: int = -1
 var _ai_timer: Timer
+
+var _tutorial_bar: PanelContainer
+var _tutorial_lbl: Label
 
 var _top_status_lbl: Label
 var _undo_btn: Button
@@ -45,13 +51,17 @@ func _ready() -> void:
 	add_child(_ai_timer)
 	_build_skeleton()
 
-func start_game(p_state: GameState) -> void:
+func start_game(p_state: GameState, p_is_tutorial: bool = false) -> void:
 	_controller = GameController.new(p_state)
 	_controller.events_applied.connect(_on_events_applied)
 	state = _controller.state
 	_selected_gems.clear()
 	_discard_pool.clear()
 	_stats_recorded = false
+	_is_tutorial = p_is_tutorial
+	_tutorial_step = 0
+	if _tutorial_bar != null:
+		_tutorial_bar.visible = _is_tutorial
 	_last_human_idx = -1
 	for p in state.players:
 		if not p.is_ai:
@@ -100,6 +110,17 @@ func _build_skeleton() -> void:
 	main_vbox.add_theme_constant_override("separation", 8)
 	margin.add_child(main_vbox)
 
+	# Tutorial Guide Bar (hidden unless tutorial mode)
+	_tutorial_bar = PanelContainer.new()
+	_tutorial_bar.visible = false
+	_tutorial_bar.add_theme_stylebox_override("panel", UITheme.make_panel_style(Color("263628"), UITheme.AFFORD_GREEN, 8, 1, 2))
+	main_vbox.add_child(_tutorial_bar)
+	_tutorial_lbl = Label.new()
+	_tutorial_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_tutorial_lbl.add_theme_font_size_override("font_size", 14)
+	_tutorial_lbl.add_theme_color_override("font_color", UITheme.TEXT_MAIN)
+	_tutorial_bar.add_child(_tutorial_lbl)
+
 	# Top Bar
 	var top_bar := PanelContainer.new()
 	top_bar.add_theme_stylebox_override("panel", UITheme.make_panel_style(UITheme.PANEL_BG, UITheme.GOLD_DIM, 8, 1))
@@ -143,6 +164,15 @@ func _build_skeleton() -> void:
 		SfxManager.play_click()
 	)
 	top_hbox.add_child(_sfx_btn)
+
+	var set_btn := Button.new()
+	set_btn.text = "设置"
+	UITheme.style_button(set_btn)
+	set_btn.pressed.connect(func() -> void:
+		SfxManager.play_click()
+		settings_requested.emit()
+	)
+	top_hbox.add_child(set_btn)
 
 	var rules_btn := Button.new()
 	rules_btn.text = "雅集规制"
@@ -504,6 +534,7 @@ func _refresh_all() -> void:
 	_refresh_reserved()
 	_refresh_bank_and_selection()
 	_refresh_log()
+	_refresh_tutorial_bar()
 
 	if _undo_btn != null:
 		var can_undo := false
@@ -664,6 +695,8 @@ func _on_events_applied(_action: GameAction, evs: Array) -> void:
 		match str(ev.get("type", "")):
 			"take":
 				var pi := int(ev.get("player", 0))
+				if _is_tutorial and not state.players[pi].is_ai and _tutorial_step == 0:
+					_tutorial_step = 1
 				var target_pos := _player_center(pi)
 				var gems: Dictionary = ev.get("gems", {})
 				var delay := 0.0
@@ -673,10 +706,16 @@ func _on_events_applied(_action: GameAction, evs: Array) -> void:
 						delay += 0.07
 			"reserve":
 				var pi := int(ev.get("player", 0))
+				if _is_tutorial and not state.players[pi].is_ai and _tutorial_step <= 1:
+					_tutorial_step = 2
 				if bool(ev.get("gold", false)):
 					_fx.fly_chip(GemTypes.GOLD, _bank_center(GemTypes.GOLD), _player_center(pi), 0.0)
 			"buy":
 				var pi := int(ev.get("player", 0))
+				if not state.players[pi].is_ai:
+					SaveManager.unlock_codex_entry("cards", str(ev.get("card_id", "")))
+					if _is_tutorial and _tutorial_step <= 2:
+						_tutorial_step = 3
 				var pts := int(ev.get("prestige", 0))
 				if pts > 0:
 					_fx.float_text("+%d 声望" % pts, _player_center(pi), UITheme.GOLD_ACCENT)
@@ -687,9 +726,12 @@ func _on_events_applied(_action: GameAction, evs: Array) -> void:
 					_fx.pulse_control(_card_slots[tier][slot])
 			"master":
 				var pi := int(ev.get("player", 0))
+				var mid := str(ev.get("master_id", ""))
+				if not state.players[pi].is_ai:
+					SaveManager.unlock_codex_entry("masters", mid)
 				var m_name := ""
 				for m in state.players[pi].masters:
-					if m.id == str(ev.get("master_id", "")):
+					if m.id == mid:
 						m_name = "%s·%s" % [m.name, m.title]
 						break
 				_fx.show_banner("名士「%s」亲临 %s 的雅集 (+%d 声望)" % [m_name, state.players[pi].name, int(ev.get("prestige", 3))])
@@ -1041,3 +1083,14 @@ func _show_player_detail_modal(p: PlayerState) -> void:
 	UITheme.style_button(close_btn)
 	close_btn.pressed.connect(func() -> void: _modal_overlay.visible = false)
 	_modal_content.add_child(close_btn)
+
+func _refresh_tutorial_bar() -> void:
+	if _tutorial_bar == null or not _is_tutorial:
+		return
+	var tips: Array[String] = [
+		"【新手引导 1/4】请先点击右侧「库房材料」选取 3 种不同材料，再点击「确认拿取」。",
+		"【新手引导 2/4】点击展示区任意一张图谱的「留存」按钮，锁定图谱并获赠 1 枚赤金（百搭）。",
+		"【新手引导 3/4】绿色边框的器物表示材料充足！点击「打造」制成你的第一件器物，获得永久折扣。",
+		"【新手引导 4/4】继续采材打造，率先达到 6 声望即可完成雅集试炼！",
+	]
+	_tutorial_lbl.text = tips[clampi(_tutorial_step, 0, tips.size() - 1)]

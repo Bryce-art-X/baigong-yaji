@@ -3,6 +3,9 @@ extends Control
 
 signal start_game_requested(player_configs: Array, target_prestige: int)
 signal continue_game_requested
+signal tutorial_requested
+signal codex_requested
+signal settings_requested
 
 var _player_count: int = 3
 var _target_prestige: int = 15
@@ -139,6 +142,43 @@ func _build_ui() -> void:
 	UITheme.style_button(_continue_btn, Color("473522"), UITheme.GOLD_ACCENT)
 	_continue_btn.pressed.connect(func() -> void: continue_game_requested.emit())
 	btn_row.add_child(_continue_btn)
+
+	var sub_row := HBoxContainer.new()
+	sub_row.add_theme_constant_override("separation", 10)
+	vbox.add_child(sub_row)
+
+	var tut_btn := Button.new()
+	tut_btn.text = "新手教学"
+	tut_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tut_btn.custom_minimum_size = Vector2(0, 36)
+	UITheme.style_button(tut_btn)
+	tut_btn.pressed.connect(func() -> void:
+		SfxManager.play_click()
+		tutorial_requested.emit()
+	)
+	sub_row.add_child(tut_btn)
+
+	var codex_btn := Button.new()
+	codex_btn.text = "《百工谱》图鉴"
+	codex_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	codex_btn.custom_minimum_size = Vector2(0, 36)
+	UITheme.style_button(codex_btn)
+	codex_btn.pressed.connect(func() -> void:
+		SfxManager.play_click()
+		codex_requested.emit()
+	)
+	sub_row.add_child(codex_btn)
+
+	var set_btn := Button.new()
+	set_btn.text = "雅阁设置"
+	set_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	set_btn.custom_minimum_size = Vector2(0, 36)
+	UITheme.style_button(set_btn)
+	set_btn.pressed.connect(func() -> void:
+		SfxManager.play_click()
+		settings_requested.emit()
+	)
+	sub_row.add_child(set_btn)
 
 	_stats_lbl = Label.new()
 	_stats_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
