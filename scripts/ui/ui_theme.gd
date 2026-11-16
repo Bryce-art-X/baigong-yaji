@@ -29,6 +29,14 @@ static func master_icon() -> Texture2D:
 	_icon_cache["_master"] = tex
 	return tex
 
+static func card_pattern(tier: int) -> Texture2D:
+	var key := "_pat_%d" % tier
+	if _icon_cache.has(key):
+		return _icon_cache[key]
+	var tex: Texture2D = load("res://assets/svg/card_pattern_t%d.svg" % clampi(tier, 1, 3))
+	_icon_cache[key] = tex
+	return tex
+
 static func tier_bg_color(tier: int) -> Color:
 	match tier:
 		1: return Color("2B221C")

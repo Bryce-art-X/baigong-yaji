@@ -14,6 +14,7 @@ var interactive: bool = true
 
 var _built: bool = false
 var _is_res_mode: bool = false
+var _pattern_rect: TextureRect
 var _root: VBoxContainer
 var _empty_lbl: Label
 var _seal: PanelContainer
@@ -49,6 +50,13 @@ func _ensure_built(is_res: bool) -> void:
 	_empty_lbl.add_theme_color_override("font_color", Color("5B4D42"))
 	_empty_lbl.visible = false
 	add_child(_empty_lbl)
+
+	_pattern_rect = TextureRect.new()
+	_pattern_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_pattern_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_pattern_rect.stretch_mode = TextureRect.STRETCH_SCALE
+	_pattern_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_pattern_rect)
 
 	_root = VBoxContainer.new()
 	_root.add_theme_constant_override("separation", 5)
@@ -161,12 +169,15 @@ func setup_reserved_card(p_card: CardData.CraftCard, p_res_idx: int, viewer: Pla
 
 func _apply_data(viewer: PlayerState) -> void:
 	if card == null:
+		_pattern_rect.visible = false
 		_root.visible = false
 		_empty_lbl.visible = true
 		tooltip_text = ""
 		add_theme_stylebox_override("panel", UITheme.make_panel_style(Color("1B1411"), Color("382C25"), 8, 1, 2))
 		return
 
+	_pattern_rect.visible = true
+	_pattern_rect.texture = UITheme.card_pattern(card.tier)
 	_root.visible = true
 	_empty_lbl.visible = false
 

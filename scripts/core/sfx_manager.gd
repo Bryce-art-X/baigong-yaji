@@ -55,6 +55,7 @@ static func _spawn_tone(freq: float, dur: float, vol: float) -> void:
 	gen.mix_rate = 22050.0
 	gen.buffer_length = dur + 0.05
 	player.stream = gen
+	player.bus = &"SFX" if AudioServer.get_bus_index(&"SFX") >= 0 else &"Master"
 	player.volume_db = linear_to_db(clampf(vol, 0.01, 1.0))
 	_host.add_child(player)
 	player.play()

@@ -7,7 +7,9 @@
 | `icon.svg` | 本项目原创 | 百工雅集项目 | 同项目 | 代码手写 SVG |
 | `assets/svg/gem_*.svg` | 本项目原创 | 百工雅集项目 | 同项目 | 代码手写 SVG |
 | `assets/svg/master_seal.svg` | 本项目原创 | 百工雅集项目 | 同项目 | 代码手写 SVG |
-| 音效 | 运行时程序合成（`scripts/core/sfx_manager.gd`） | 百工雅集项目 | 同项目 | 无音频文件 |
+| `assets/svg/card_pattern_t*.svg` | 本项目原创 | 百工雅集项目 | 同项目 | 三阶卡框国风纹样 SVG |
+| `assets/fonts/LXGWWenKai-Regular.ttf` | [lxgw/LxgwWenKai](https://github.com/lxgw/LxgwWenKai) | 落霞孤鹜 (LXGW) | SIL OFL 1.0 | 霞鹜文楷 v1.511 开源中文字体 |
+| 音效与背景音乐 | 运行时程序合成（`sfx_manager.gd`, `bgm_manager.gd`） | 百工雅集项目 | 同项目 | 五声音阶合成，无音频文件 |
 
 ## 规则
 - 仅使用：原创、CC0、CC-BY（需署名）、SIL OFL（字体）、明确允许商用的 AI 生成内容。

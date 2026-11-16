@@ -57,6 +57,12 @@ func _apply(key: String) -> void:
 	match key:
 		"sfx_enabled":
 			SfxManager.muted = not bool(_values[key])
+		"master_volume":
+			_set_bus_vol(&"Master", float(_values[key]))
+		"music_volume":
+			_set_bus_vol(&"Music", float(_values[key]))
+		"sfx_volume":
+			_set_bus_vol(&"SFX", float(_values[key]))
 		"fullscreen":
 			if DisplayServer.get_name() == "headless" or OS.has_feature("mobile") or OS.has_feature("web"):
 				return
@@ -64,3 +70,9 @@ func _apply(key: String) -> void:
 			DisplayServer.window_set_mode(mode)
 		"language":
 			TranslationServer.set_locale(str(_values[key]))
+
+func _set_bus_vol(bus_name: StringName, linear: float) -> void:
+	var idx := AudioServer.get_bus_index(bus_name)
+	if idx >= 0:
+		AudioServer.set_bus_mute(idx, linear <= 0.01)
+		AudioServer.set_bus_volume_db(idx, linear_to_db(clampf(linear, 0.01, 1.0)))

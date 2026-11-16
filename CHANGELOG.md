@@ -1,5 +1,11 @@
 # 更新日志
 
+## [0.6.0] - 2026-11-16 · P3 美术与音频升级
+- 嵌入开源可商用中文字体「霞鹜文楷」（`LXGWWenKai-Regular.ttf`，SIL OFL 1.0），统一全平台字体表现。
+- 新增三阶器物卡专属国风框饰 SVG 纹样（`card_pattern_t1/t2/t3.svg`）。
+- 新增 `default_bus_layout.tres`（Master / Music / SFX 三总线）与 `BgmManager` 程序合成古风五声音阶循环背景乐，`Settings` 音量设置正式生效。
+- 更新 `assets/LICENSES.md` 登记全部字体、矢量图与音频来源。
+
 ## [0.5.0] - 2026-11-16 · P2 UI 架构重写与动画演出
 - `BoardView` / `CardView` / `MasterView` / `PlayerPanel` 全面改为常驻节点 + 就地更新，彻底消除删光重建与闪烁。
 - 自适应桌面与手机横屏布局，修复费用圆点拉伸问题，在 1280×720、1440×900、1920×1080、2400×1080 四套分辨率下均无留白与重叠。

@@ -7,6 +7,7 @@ var _last_target: int = 15
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	BgmManager.ensure_running(self)
 
 	_menu = MainMenu.new()
 	_menu.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
