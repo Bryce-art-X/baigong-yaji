@@ -72,7 +72,12 @@ func update_player(p: PlayerState, is_current: bool) -> void:
 		4
 	))
 
-	_name_lbl.text = "%s%s" % [p.name, " [AI]" if p.is_ai else ""]
+	var ai_tag := ""
+	if p.is_ai:
+		var lv_names: Array[String] = ["书童", "匠师", "宗师"]
+		var lv_name: String = lv_names[clampi(p.ai_level, 0, 2)]
+		ai_tag = " [%s·%s]" % [lv_name, AIAgent.persona_label(p.ai_persona)]
+	_name_lbl.text = "%s%s" % [p.name, ai_tag]
 	_name_lbl.add_theme_color_override("font_color", UITheme.GOLD_ACCENT if is_current else UITheme.TEXT_MAIN)
 	_score_lbl.text = "%d 分" % p.get_score()
 	_sub_lbl.text = "已制 %d 件 · 留存 %d · 名士 %d · 材料 %d/10" % [

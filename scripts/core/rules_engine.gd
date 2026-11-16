@@ -53,7 +53,8 @@ static func create_game(player_configs: Array, target_prestige: int = 15, rng_se
 			i,
 			str(cfg.get("name", "玩家 %d" % (i + 1))),
 			bool(cfg.get("is_ai", false)),
-			int(cfg.get("ai_level", 1))
+			int(cfg.get("ai_level", 1)),
+			str(cfg.get("ai_persona", "balanced"))
 		))
 
 	# Bank: 2P -> 4, 3P -> 5, 4P -> 7 of each base material; gold always 5.

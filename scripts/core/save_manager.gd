@@ -64,6 +64,7 @@ static func serialize_state(state: GameState) -> Dictionary:
 			"name": p.name,
 			"is_ai": p.is_ai,
 			"ai_level": p.ai_level,
+			"ai_persona": p.ai_persona,
 			"chips": p.chips.duplicate(),
 			"discounts": p.discounts.duplicate(),
 			"purchased": pur,
@@ -123,7 +124,8 @@ static func deserialize_state(d: Dictionary) -> GameState:
 			int(pd.get("index", 0)),
 			str(pd.get("name", "玩家")),
 			bool(pd.get("is_ai", false)),
-			int(pd.get("ai_level", 1))
+			int(pd.get("ai_level", 1)),
+			str(pd.get("ai_persona", "balanced"))
 		)
 		p.chips = pd.get("chips", GemTypes.create_empty_pool(true)).duplicate()
 		p.discounts = pd.get("discounts", GemTypes.create_empty_pool(false)).duplicate()

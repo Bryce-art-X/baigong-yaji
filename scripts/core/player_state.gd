@@ -4,7 +4,8 @@ extends RefCounted
 var index: int
 var name: String
 var is_ai: bool
-var ai_level: int = 1 # 0 = 书童(基础), 1 = 匠师(进阶)
+var ai_level: int = 1 # 0 = 书童(易), 1 = 匠师(中), 2 = 宗师(难)
+var ai_persona: String = "balanced" # balanced / artisan / collector / scholar / interceptor
 
 var chips: Dictionary
 var discounts: Dictionary
@@ -12,11 +13,12 @@ var purchased: Array[CardData.CraftCard] = []
 var reserved: Array[CardData.CraftCard] = []
 var masters: Array[CardData.MasterTile] = []
 
-func _init(p_index: int, p_name: String, p_is_ai: bool = false, p_ai_level: int = 1) -> void:
+func _init(p_index: int, p_name: String, p_is_ai: bool = false, p_ai_level: int = 1, p_persona: String = "balanced") -> void:
 	index = p_index
 	name = p_name
 	is_ai = p_is_ai
 	ai_level = p_ai_level
+	ai_persona = p_persona
 	chips = GemTypes.create_empty_pool(true)
 	discounts = GemTypes.create_empty_pool(false)
 

@@ -177,7 +177,8 @@ func _refresh_seats() -> void:
 	for c in _seats_box.get_children():
 		c.queue_free()
 
-	var mode_labels := ["真人操作", "书童 AI（基础）", "匠师 AI（进阶）"]
+	var mode_labels := ["真人操作", "书童 AI（易）", "匠师 AI（中）", "宗师 AI（难）"]
+	var personas := ["balanced", "artisan", "scholar", "interceptor"]
 	for i in range(_player_count):
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
@@ -192,22 +193,24 @@ func _refresh_seats() -> void:
 		row.add_child(name_edit)
 
 		var mode_btn := Button.new()
-		mode_btn.custom_minimum_size = Vector2(150, 0)
+		mode_btn.custom_minimum_size = Vector2(156, 0)
 		mode_btn.text = mode_labels[_seat_modes[i]]
 		UITheme.style_button(mode_btn, Color("2E241E") if _seat_modes[i] == 0 else Color("3B2D22"))
 		mode_btn.pressed.connect(func() -> void:
-			_seat_modes[i] = (_seat_modes[i] + 1) % 3
+			_seat_modes[i] = (_seat_modes[i] + 1) % 4
 			_refresh_seats()
 		)
 		row.add_child(mode_btn)
 
 func _on_start_pressed() -> void:
+	var personas := ["balanced", "artisan", "scholar", "interceptor"]
 	var configs: Array = []
 	for i in range(_player_count):
 		var m := _seat_modes[i]
 		configs.append({
 			"name": _seat_names[i].strip_edges() if not _seat_names[i].strip_edges().is_empty() else "匠师 %d" % (i + 1),
 			"is_ai": m > 0,
-			"ai_level": 0 if m == 1 else 1
+			"ai_level": maxi(0, m - 1),
+			"ai_persona": personas[i % personas.size()] if m > 0 else "balanced"
 		})
 	start_game_requested.emit(configs, _target_prestige)
