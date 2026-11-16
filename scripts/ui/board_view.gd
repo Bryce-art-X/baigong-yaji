@@ -235,30 +235,16 @@ func _build_skeleton() -> void:
 		left_v.add_child(pp)
 		_player_panels.append(pp)
 
-	# Center: Masters + 3x4 Responsive Board + Reserved
+	# Center: Direct tabletop placement (Masters + 3x4 Portrait Cards + Reserved)
 	var center_v := VBoxContainer.new()
 	center_v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	center_v.add_theme_constant_override("separation", 8)
+	center_v.add_theme_constant_override("separation", 10)
 	body.add_child(center_v)
 
-	var masters_panel := PanelContainer.new()
-	masters_panel.add_theme_stylebox_override("panel", UITheme.make_panel_style())
-	center_v.add_child(masters_panel)
-
-	var m_hbox := HBoxContainer.new()
-	m_hbox.add_theme_constant_override("separation", 10)
-	masters_panel.add_child(m_hbox)
-
-	var m_lbl := Label.new()
-	m_lbl.text = "名士\n雅客"
-	m_lbl.add_theme_font_size_override("font_size", 14)
-	m_lbl.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
-	m_hbox.add_child(m_lbl)
-
 	var masters_row := HBoxContainer.new()
-	masters_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	masters_row.add_theme_constant_override("separation", 8)
-	m_hbox.add_child(masters_row)
+	masters_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	masters_row.add_theme_constant_override("separation", 12)
+	center_v.add_child(masters_row)
 
 	for _i in range(5):
 		var mv := MasterView.new()
@@ -266,27 +252,23 @@ func _build_skeleton() -> void:
 		masters_row.add_child(mv)
 		_master_slots.append(mv)
 
-	var board_panel := PanelContainer.new()
-	board_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	board_panel.add_theme_stylebox_override("panel", UITheme.make_panel_style())
-	center_v.add_child(board_panel)
+	var tiers_center := CenterContainer.new()
+	tiers_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	center_v.add_child(tiers_center)
 
 	var tiers_box := VBoxContainer.new()
-	tiers_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tiers_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	tiers_box.add_theme_constant_override("separation", 8)
-	board_panel.add_child(tiers_box)
+	tiers_box.add_theme_constant_override("separation", 12)
+	tiers_center.add_child(tiers_box)
 
 	for tier in [3, 2, 1]:
 		var row := HBoxContainer.new()
-		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		row.add_theme_constant_override("separation", 8)
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_theme_constant_override("separation", 14)
 		tiers_box.add_child(row)
 
 		var deck_btn := Button.new()
-		deck_btn.custom_minimum_size = Vector2(90, 130)
-		deck_btn.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		deck_btn.custom_minimum_size = Vector2(118, 166)
+		deck_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		deck_btn.pressed.connect(func() -> void: _on_reserve_deck(tier))
 		row.add_child(deck_btn)
 		_deck_btns[tier] = deck_btn
@@ -299,27 +281,22 @@ func _build_skeleton() -> void:
 			row.add_child(cv)
 			_card_slots[tier].append(cv)
 
-	var res_panel := PanelContainer.new()
-	res_panel.add_theme_stylebox_override("panel", UITheme.make_panel_style())
-	center_v.add_child(res_panel)
-
 	var res_hbox := HBoxContainer.new()
-	res_hbox.add_theme_constant_override("separation", 10)
-	res_panel.add_child(res_hbox)
+	res_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	res_hbox.add_theme_constant_override("separation", 12)
+	center_v.add_child(res_hbox)
 
 	_reserved_title = Label.new()
 	_reserved_title.text = "留存\n图谱"
-	_reserved_title.add_theme_font_size_override("font_size", 14)
+	_reserved_title.add_theme_font_size_override("font_size", 13)
 	_reserved_title.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
 	res_hbox.add_child(_reserved_title)
 
 	var res_row := HBoxContainer.new()
-	res_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	res_row.add_theme_constant_override("separation", 8)
+	res_row.add_theme_constant_override("separation", 10)
 	res_hbox.add_child(res_row)
 
 	_reserved_empty_lbl = Label.new()
-	_reserved_empty_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_reserved_empty_lbl.add_theme_font_size_override("font_size", 13)
 	_reserved_empty_lbl.add_theme_color_override("font_color", UITheme.TEXT_MUTED)
 	res_row.add_child(_reserved_empty_lbl)
@@ -331,70 +308,71 @@ func _build_skeleton() -> void:
 		res_row.add_child(rcv)
 		_reserved_slots.append(rcv)
 
-	# Right: Persistent Bank + Log
+	# Right: Physical Round Chip Tray + Log
 	var right_panel := PanelContainer.new()
-	right_panel.custom_minimum_size = Vector2(268, 0)
-	right_panel.add_theme_stylebox_override("panel", UITheme.make_panel_style())
+	right_panel.custom_minimum_size = Vector2(262, 0)
+	right_panel.add_theme_stylebox_override("panel", UITheme.make_panel_style(Color("17110E", 0.72), Color("5C4828", 0.5), 10, 1))
 	body.add_child(right_panel)
 
 	var right_v := VBoxContainer.new()
-	right_v.add_theme_constant_override("separation", 8)
+	right_v.add_theme_constant_override("separation", 10)
 	right_panel.add_child(right_v)
 
 	var bank_hdr := Label.new()
-	bank_hdr.text = "库房材料（点击选取）"
-	bank_hdr.add_theme_font_size_override("font_size", 16)
+	bank_hdr.text = "库房玉石（直点选取）"
+	bank_hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	bank_hdr.add_theme_font_size_override("font_size", 15)
 	bank_hdr.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
 	right_v.add_child(bank_hdr)
 
+	var bank_grid := GridContainer.new()
+	bank_grid.columns = 2
+	bank_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	bank_grid.add_theme_constant_override("h_separation", 16)
+	bank_grid.add_theme_constant_override("v_separation", 12)
+	right_v.add_child(bank_grid)
+
 	for g in GemTypes.ALL_GEMS:
+		var cell := VBoxContainer.new()
+		cell.alignment = BoxContainer.ALIGNMENT_CENTER
+		cell.add_theme_constant_override("separation", 3)
+		bank_grid.add_child(cell)
+
 		var chip_btn := Button.new()
-		chip_btn.custom_minimum_size = Vector2(0, 44)
+		chip_btn.custom_minimum_size = Vector2(78, 78)
+		chip_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		chip_btn.pressed.connect(func() -> void: _on_bank_gem_clicked(g))
-		right_v.add_child(chip_btn)
-
-		var pad := MarginContainer.new()
-		pad.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		pad.add_theme_constant_override("margin_left", 8)
-		pad.add_theme_constant_override("margin_right", 10)
-		chip_btn.add_child(pad)
-
-		var row := HBoxContainer.new()
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_theme_constant_override("separation", 10)
-		pad.add_child(row)
+		cell.add_child(chip_btn)
 
 		var icon := TextureRect.new()
 		icon.texture = UITheme.gem_icon(g)
-		icon.custom_minimum_size = Vector2(30, 30)
+		icon.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+		icon.offset_left = -22
+		icon.offset_top = -22
+		icon.offset_right = 22
+		icon.offset_bottom = 22
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(icon)
-
-		var name_lbl := Label.new()
-		name_lbl.text = GemTypes.gem_name(g)
-		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		name_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		name_lbl.add_theme_font_size_override("font_size", 14)
-		name_lbl.add_theme_color_override("font_color", UITheme.TEXT_MAIN)
-		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(name_lbl)
+		chip_btn.add_child(icon)
 
 		var sel_lbl := Label.new()
 		sel_lbl.visible = false
-		sel_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		sel_lbl.position = Vector2(52, 2)
+		sel_lbl.size = Vector2(26, 22)
+		sel_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		sel_lbl.add_theme_font_size_override("font_size", 14)
 		sel_lbl.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
+		sel_lbl.add_theme_color_override("font_shadow_color", Color.BLACK)
+		sel_lbl.add_theme_constant_override("shadow_offset_x", 1)
+		sel_lbl.add_theme_constant_override("shadow_offset_y", 1)
 		sel_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(sel_lbl)
+		chip_btn.add_child(sel_lbl)
 
 		var cnt_lbl := Label.new()
-		cnt_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		cnt_lbl.add_theme_font_size_override("font_size", 13)
-		cnt_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(cnt_lbl)
+		cnt_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cnt_lbl.add_theme_font_size_override("font_size", 12)
+		cell.add_child(cnt_lbl)
 
 		_bank_slots[g] = {"btn": chip_btn, "sel_lbl": sel_lbl, "cnt_lbl": cnt_lbl}
 
@@ -621,9 +599,25 @@ func _refresh_board() -> void:
 	for tier in [3, 2, 1]:
 		var deck_btn: Button = _deck_btns[tier]
 		var rem: int = state.decks[tier].size()
-		deck_btn.text = "%s阶\n图谱\n(%d)" % [["", "一", "二", "三"][tier], rem]
+		deck_btn.text = "%s\n\n· %d ·" % [["", "壹", "贰", "叁"][tier], rem]
 		deck_btn.disabled = not (human_turn and rem > 0 and viewer.reserved.size() < GameState.MAX_RESERVED)
-		UITheme.style_button(deck_btn, UITheme.tier_bg_color(tier), UITheme.GOLD_DIM)
+		var deck_sb := StyleBoxFlat.new()
+		deck_sb.bg_color = UITheme.tier_bg_color(tier).darkened(0.15)
+		deck_sb.border_color = Color("C8B288", 0.55)
+		deck_sb.set_border_width_all(2)
+		deck_sb.border_width_bottom = 6
+		deck_sb.border_width_right = 4
+		deck_sb.set_corner_radius_all(9)
+		deck_sb.shadow_color = Color(0, 0, 0, 0.65)
+		deck_sb.shadow_size = 8
+		deck_sb.shadow_offset = Vector2(4, 6)
+		deck_btn.add_theme_stylebox_override("normal", deck_sb)
+		deck_btn.add_theme_stylebox_override("hover", deck_sb)
+		deck_btn.add_theme_stylebox_override("pressed", deck_sb)
+		deck_btn.add_theme_stylebox_override("disabled", deck_sb)
+		deck_btn.add_theme_font_size_override("font_size", 18)
+		deck_btn.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
+		deck_btn.add_theme_color_override("font_disabled_color", UITheme.TEXT_MUTED)
 
 		var slots: Array = _card_slots[tier]
 		for slot in range(4):
@@ -663,14 +657,26 @@ func _refresh_bank_and_selection() -> void:
 		var can_pick := (g != GemTypes.GOLD) and human_turn and _can_add_to_selection(g)
 
 		chip_btn.disabled = (g == GemTypes.GOLD) or (not can_pick and sel_cnt == 0)
-		var bg_col := Color("3A2C21") if sel_cnt > 0 else Color("241C17")
-		var bd_col := UITheme.GOLD_ACCENT if sel_cnt > 0 else UITheme.GOLD_DIM
-		UITheme.style_button(chip_btn, bg_col, bd_col)
+		var chip_sb := StyleBoxFlat.new()
+		chip_sb.bg_color = GemTypes.gem_color(g).darkened(0.45) if sel_cnt == 0 else GemTypes.gem_color(g).darkened(0.18)
+		chip_sb.border_color = UITheme.GOLD_ACCENT if sel_cnt > 0 else Color("E8DEC8", 0.55)
+		chip_sb.set_border_width_all(3 if sel_cnt > 0 else 2)
+		chip_sb.set_corner_radius_all(999)
+		chip_sb.shadow_color = Color(0, 0, 0, 0.55)
+		chip_sb.shadow_size = 6
+		chip_sb.shadow_offset = Vector2(2, 4)
+		var hover_sb := chip_sb.duplicate() as StyleBoxFlat
+		hover_sb.border_color = UITheme.GOLD_ACCENT
+		hover_sb.bg_color = chip_sb.bg_color.lightened(0.12)
+		chip_btn.add_theme_stylebox_override("normal", chip_sb)
+		chip_btn.add_theme_stylebox_override("hover", hover_sb)
+		chip_btn.add_theme_stylebox_override("pressed", chip_sb)
+		chip_btn.add_theme_stylebox_override("disabled", chip_sb)
 
 		sel_lbl.visible = sel_cnt > 0
 		if sel_cnt > 0:
 			sel_lbl.text = "+%d" % sel_cnt
-		cnt_lbl.text = "×%d" % amt if g != GemTypes.GOLD else "×%d (留存)" % amt
+		cnt_lbl.text = "%s ×%d" % [GemTypes.gem_name(g), amt]
 		cnt_lbl.add_theme_color_override("font_color", UITheme.TEXT_MUTED if g == GemTypes.GOLD else UITheme.TEXT_MAIN)
 
 	if _selected_gems.is_empty():
