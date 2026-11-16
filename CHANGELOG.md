@@ -1,5 +1,10 @@
 # 更新日志
 
+## [1.0.0] - 2026-11-16 · P8 正式版收官与多平台导出预设
+- 新增 `export_presets.cfg`，预设 **Windows Desktop**、**Web (HTML5)** 与 **Android** 三端导出配置（排除 `tests/` 与 `tools/`，内嵌 PCK）。
+- 新增 `docs/RELEASE_CHECKLIST.md` 发布验收清单与一键导出命令。
+- 版本号升至 `1.0.0`。
+
 ## [0.9.0] - 2026-11-16 · P6 每日雅集与成就系统
 - 新增「每日雅集」模式：以当日日期为固定种子开启 3 人标准局（匠师 AI + 宗师 AI），并记录当日胜负与最佳轮数（`user://daily.json`）。
 - 新增成就系统（`Achievements` + `AchievementsModal`）：内置 10 项局内/局外成就（如宗师之敌、神速巧工、群贤毕至、传世瑰宝等），完赛自动结算并横幅提示。
