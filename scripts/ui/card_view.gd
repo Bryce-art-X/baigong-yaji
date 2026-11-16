@@ -12,46 +12,167 @@ var is_affordable: bool = false
 var can_reserve: bool = false
 var interactive: bool = true
 
-var _actions_box: HBoxContainer
+var _built: bool = false
+var _is_res_mode: bool = false
+var _root: VBoxContainer
+var _empty_lbl: Label
+var _seal: PanelContainer
+var _seal_spacer: Control
+var _prestige_lbl: Label
+var _tier_lbl: Label
+var _bonus_icon: TextureRect
+var _title_lbl: Label
+var _cost_pips: Dictionary = {} # gem -> {panel, lbl}
 var _buy_btn: Button
 var _res_btn: Button
 
+func _ensure_built(is_res: bool) -> void:
+	if _built:
+		return
+	_built = true
+	_is_res_mode = is_res
+	if is_res:
+		custom_minimum_size = Vector2(160, 118)
+		size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	else:
+		custom_minimum_size = Vector2(150, 146)
+		size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+	mouse_entered.connect(_on_hover_enter)
+	mouse_exited.connect(_on_hover_exit)
+
+	_empty_lbl = Label.new()
+	_empty_lbl.text = "已空"
+	_empty_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_empty_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_empty_lbl.add_theme_color_override("font_color", Color("5B4D42"))
+	_empty_lbl.visible = false
+	add_child(_empty_lbl)
+
+	_root = VBoxContainer.new()
+	_root.add_theme_constant_override("separation", 5)
+	add_child(_root)
+
+	# Header: Prestige Seal + Tier + SVG Gem Icon
+	var header := HBoxContainer.new()
+	_root.add_child(header)
+
+	_seal = PanelContainer.new()
+	_seal.custom_minimum_size = Vector2(28, 26)
+	var seal_sb := StyleBoxFlat.new()
+	seal_sb.bg_color = UITheme.SEAL_RED
+	seal_sb.border_color = UITheme.GOLD_ACCENT
+	seal_sb.set_border_width_all(1)
+	seal_sb.set_corner_radius_all(4)
+	_seal.add_theme_stylebox_override("panel", seal_sb)
+	_prestige_lbl = Label.new()
+	_prestige_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_prestige_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_prestige_lbl.add_theme_font_size_override("font_size", 15)
+	_prestige_lbl.add_theme_color_override("font_color", UITheme.TEXT_MAIN)
+	_seal.add_child(_prestige_lbl)
+	header.add_child(_seal)
+
+	_seal_spacer = Control.new()
+	_seal_spacer.custom_minimum_size = Vector2(28, 26)
+	header.add_child(_seal_spacer)
+
+	_tier_lbl = Label.new()
+	_tier_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_tier_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_tier_lbl.add_theme_font_size_override("font_size", 11)
+	_tier_lbl.add_theme_color_override("font_color", UITheme.TEXT_MUTED)
+	header.add_child(_tier_lbl)
+
+	_bonus_icon = TextureRect.new()
+	_bonus_icon.custom_minimum_size = Vector2(28, 28)
+	_bonus_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_bonus_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	header.add_child(_bonus_icon)
+
+	# Craft Title
+	_title_lbl = Label.new()
+	_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_title_lbl.clip_text = true
+	_title_lbl.add_theme_font_size_override("font_size", 15)
+	_title_lbl.add_theme_color_override("font_color", UITheme.TEXT_MAIN)
+	_root.add_child(_title_lbl)
+
+	# Cost row (circular pips with SIZE_SHRINK_CENTER so they never stretch vertically!)
+	var cost_row := HBoxContainer.new()
+	cost_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	cost_row.add_theme_constant_override("separation", 6)
+	cost_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_root.add_child(cost_row)
+
+	for g in GemTypes.BASE_GEMS:
+		var pip := PanelContainer.new()
+		pip.custom_minimum_size = Vector2(28, 28)
+		pip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		pip.add_theme_stylebox_override("panel", UITheme.make_chip_style(g, 999, 1))
+		var c_lbl := Label.new()
+		c_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		c_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		c_lbl.add_theme_font_size_override("font_size", 12)
+		c_lbl.add_theme_color_override("font_color", GemTypes.gem_text_color(g))
+		pip.add_child(c_lbl)
+		cost_row.add_child(pip)
+		_cost_pips[g] = {"panel": pip, "lbl": c_lbl}
+
+	# Action buttons
+	var actions_box := HBoxContainer.new()
+	actions_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions_box.add_theme_constant_override("separation", 6)
+	_root.add_child(actions_box)
+
+	_buy_btn = Button.new()
+	_buy_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_buy_btn.custom_minimum_size = Vector2(0, 30)
+	_buy_btn.add_theme_font_size_override("font_size", 12)
+	_buy_btn.pressed.connect(func() -> void: buy_requested.emit(tier, slot, reserved_idx))
+	actions_box.add_child(_buy_btn)
+
+	if not is_res:
+		_res_btn = Button.new()
+		_res_btn.text = "留存"
+		_res_btn.custom_minimum_size = Vector2(48, 30)
+		_res_btn.add_theme_font_size_override("font_size", 12)
+		_res_btn.pressed.connect(func() -> void: reserve_requested.emit(tier, slot))
+		actions_box.add_child(_res_btn)
+
 func setup_board_card(p_card: CardData.CraftCard, p_tier: int, p_slot: int, viewer: PlayerState, p_interactive: bool) -> void:
+	_ensure_built(false)
 	card = p_card
 	tier = p_tier
 	slot = p_slot
 	reserved_idx = -1
 	interactive = p_interactive
-	_build(viewer)
+	_apply_data(viewer)
 
 func setup_reserved_card(p_card: CardData.CraftCard, p_res_idx: int, viewer: PlayerState, p_interactive: bool) -> void:
+	_ensure_built(true)
 	card = p_card
 	tier = p_card.tier
 	slot = -1
 	reserved_idx = p_res_idx
 	interactive = p_interactive
-	_build(viewer)
+	_apply_data(viewer)
 
-func _build(viewer: PlayerState) -> void:
-	for c in get_children():
-		c.queue_free()
-
-	var is_res := reserved_idx >= 0
-	custom_minimum_size = Vector2(174, 154) if not is_res else Vector2(162, 124)
-
+func _apply_data(viewer: PlayerState) -> void:
 	if card == null:
+		_root.visible = false
+		_empty_lbl.visible = true
+		tooltip_text = ""
 		add_theme_stylebox_override("panel", UITheme.make_panel_style(Color("1B1411"), Color("382C25"), 8, 1, 2))
-		var empty_lbl := Label.new()
-		empty_lbl.text = "已空"
-		empty_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		empty_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		empty_lbl.add_theme_color_override("font_color", Color("5B4D42"))
-		add_child(empty_lbl)
 		return
+
+	_root.visible = true
+	_empty_lbl.visible = false
 
 	var pay_info := viewer.compute_payment(card) if viewer != null else {"valid": false, "gold_needed": 0, "gold_shortage": 0, "shortfall": {}}
 	is_affordable = bool(pay_info["valid"])
-	can_reserve = (not is_res) and viewer != null and viewer.reserved.size() < GameState.MAX_RESERVED
+	can_reserve = (not _is_res_mode) and viewer != null and viewer.reserved.size() < GameState.MAX_RESERVED
 
 	var tip_lines: Array[String] = ["%s（%s·%d 声望）" % [card.name, GemTypes.gem_name(card.bonus), card.prestige]]
 	if viewer != null:
@@ -72,109 +193,28 @@ func _build(viewer: PlayerState) -> void:
 	var border_col := UITheme.AFFORD_GREEN if (is_affordable and interactive) else UITheme.GOLD_DIM
 	add_theme_stylebox_override("panel", UITheme.make_panel_style(base_bg, border_col, 10, 2 if is_affordable else 1, 6))
 
-	if not mouse_entered.is_connected(_on_hover_enter):
-		mouse_entered.connect(_on_hover_enter)
-		mouse_exited.connect(_on_hover_exit)
-
-	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 5)
-	add_child(root)
-
-	# Header: Prestige Seal + Tier + SVG Gem Icon
-	var header := HBoxContainer.new()
-	root.add_child(header)
-
-	if card.prestige > 0:
-		var seal := PanelContainer.new()
-		seal.custom_minimum_size = Vector2(28, 26)
-		var seal_sb := StyleBoxFlat.new()
-		seal_sb.bg_color = UITheme.SEAL_RED
-		seal_sb.border_color = UITheme.GOLD_ACCENT
-		seal_sb.set_border_width_all(1)
-		seal_sb.set_corner_radius_all(4)
-		seal.add_theme_stylebox_override("panel", seal_sb)
-		var p_lbl := Label.new()
-		p_lbl.text = str(card.prestige)
-		p_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		p_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		p_lbl.add_theme_font_size_override("font_size", 15)
-		p_lbl.add_theme_color_override("font_color", UITheme.TEXT_MAIN)
-		seal.add_child(p_lbl)
-		header.add_child(seal)
-	else:
-		var spacer := Control.new()
-		spacer.custom_minimum_size = Vector2(28, 26)
-		header.add_child(spacer)
-
-	var tier_lbl := Label.new()
-	tier_lbl.text = ["", "一阶雅物", "二阶名匠", "三阶传世"][card.tier]
-	tier_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tier_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tier_lbl.add_theme_font_size_override("font_size", 11)
-	tier_lbl.add_theme_color_override("font_color", UITheme.TEXT_MUTED)
-	header.add_child(tier_lbl)
-
-	var bonus_icon := TextureRect.new()
-	bonus_icon.texture = UITheme.gem_icon(card.bonus)
-	bonus_icon.custom_minimum_size = Vector2(28, 28)
-	bonus_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	bonus_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	header.add_child(bonus_icon)
-
-	# Craft Title + Center Emblem
-	var title := Label.new()
-	title.text = card.name
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.clip_text = true
-	title.add_theme_font_size_override("font_size", 15)
-	title.add_theme_color_override("font_color", UITheme.TEXT_MAIN)
-	root.add_child(title)
-
-	# Cost row
-	var cost_row := HBoxContainer.new()
-	cost_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	cost_row.add_theme_constant_override("separation", 5)
-	cost_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_child(cost_row)
+	_seal.visible = card.prestige > 0
+	_seal_spacer.visible = card.prestige <= 0
+	_prestige_lbl.text = str(card.prestige)
+	_tier_lbl.text = ["", "一阶雅物", "二阶名匠", "三阶传世"][card.tier]
+	_bonus_icon.texture = UITheme.gem_icon(card.bonus)
+	_title_lbl.text = card.name
 
 	for g in GemTypes.BASE_GEMS:
 		var c_amt := int(card.cost.get(g, 0))
+		var pip: PanelContainer = _cost_pips[g]["panel"]
+		var lbl: Label = _cost_pips[g]["lbl"]
+		pip.visible = c_amt > 0
 		if c_amt > 0:
-			var pip := PanelContainer.new()
-			pip.custom_minimum_size = Vector2(26, 24)
-			pip.add_theme_stylebox_override("panel", UITheme.make_chip_style(g, 999, 1))
-			var c_lbl := Label.new()
-			c_lbl.text = str(c_amt)
-			c_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			c_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			c_lbl.add_theme_font_size_override("font_size", 12)
-			c_lbl.add_theme_color_override("font_color", GemTypes.gem_text_color(g))
-			pip.add_child(c_lbl)
-			cost_row.add_child(pip)
+			lbl.text = str(c_amt)
 
-	# Action buttons (Buy / Reserve)
-	_actions_box = HBoxContainer.new()
-	_actions_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	_actions_box.add_theme_constant_override("separation", 6)
-	root.add_child(_actions_box)
-
-	_buy_btn = Button.new()
 	_buy_btn.text = "打造" if is_affordable else ("差 %d" % int(pay_info["gold_shortage"]))
 	_buy_btn.disabled = not (is_affordable and interactive)
-	_buy_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_buy_btn.add_theme_font_size_override("font_size", 12)
 	UITheme.style_button(_buy_btn, Color("295439") if is_affordable else Color("241D19"), UITheme.AFFORD_GREEN if is_affordable else UITheme.GOLD_DIM)
-	_buy_btn.pressed.connect(func() -> void: buy_requested.emit(tier, slot, reserved_idx))
-	_actions_box.add_child(_buy_btn)
 
-	if not is_res:
-		_res_btn = Button.new()
-		_res_btn.text = "留存"
+	if _res_btn != null:
 		_res_btn.disabled = not (can_reserve and interactive)
-		_res_btn.add_theme_font_size_override("font_size", 12)
 		UITheme.style_button(_res_btn, Color("473522"), UITheme.GOLD_DIM)
-		_res_btn.pressed.connect(func() -> void: reserve_requested.emit(tier, slot))
-		_actions_box.add_child(_res_btn)
 
 func _on_hover_enter() -> void:
 	if card == null:

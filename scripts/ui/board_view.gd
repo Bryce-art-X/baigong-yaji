@@ -9,22 +9,29 @@ var state: GameState
 var _selected_gems: Array[String] = []
 var _discard_pool: Dictionary = {}
 var _stats_recorded: bool = false
+var _last_human_idx: int = -1
 var _ai_timer: Timer
 
 var _top_status_lbl: Label
 var _undo_btn: Button
+var _anim_btn: Button
 var _sfx_btn: Button
-var _players_box: VBoxContainer
-var _masters_row: HBoxContainer
-var _tiers_box: VBoxContainer
-var _reserved_row: HBoxContainer
+var _player_panels: Array[PlayerPanel] = []
+var _master_slots: Array[MasterView] = []
+var _deck_btns: Dictionary = {} # tier -> Button
+var _card_slots: Dictionary = {} # tier -> Array[CardView]
+var _reserved_slots: Array[CardView] = []
+var _reserved_empty_lbl: Label
 var _reserved_title: Label
-var _bank_box: VBoxContainer
+var _bank_slots: Dictionary = {} # gem -> {btn, sel_lbl, cnt_lbl}
 var _selection_lbl: Label
 var _confirm_take_btn: Button
 var _clear_take_btn: Button
 var _log_lbl: RichTextLabel
 
+var _fx: FxLayer
+var _curtain_overlay: ColorRect
+var _curtain_lbl: Label
 var _modal_overlay: ColorRect
 var _modal_panel: PanelContainer
 var _modal_content: VBoxContainer
@@ -40,16 +47,40 @@ func _ready() -> void:
 
 func start_game(p_state: GameState) -> void:
 	_controller = GameController.new(p_state)
-	_controller.events_applied.connect(func(_act: GameAction, evs: Array) -> void:
-		EventBus.game_events.emit(evs)
-	)
+	_controller.events_applied.connect(_on_events_applied)
 	state = _controller.state
 	_selected_gems.clear()
 	_discard_pool.clear()
 	_stats_recorded = false
+	_last_human_idx = -1
+	for p in state.players:
+		if not p.is_ai:
+			_last_human_idx = p.index
+			break
 	EventBus.game_started.emit(state)
 	_refresh_all()
 	_schedule_ai_if_needed()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not visible or state == null:
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_Z and event.ctrl_pressed:
+			if _undo_btn != null and not _undo_btn.disabled:
+				_on_undo_pressed()
+				get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+			if _confirm_take_btn != null and not _confirm_take_btn.disabled and not _modal_overlay.visible and not _curtain_overlay.visible:
+				_on_confirm_take_pressed()
+				get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_ESCAPE:
+			if _modal_overlay.visible and state.phase == GameState.TurnPhase.ACTION:
+				_modal_overlay.visible = false
+				get_viewport().set_input_as_handled()
+			elif not _selected_gems.is_empty():
+				_selected_gems.clear()
+				_refresh_bank_and_selection()
+				get_viewport().set_input_as_handled()
 
 func _build_skeleton() -> void:
 	var bg := ColorRect.new()
@@ -57,9 +88,6 @@ func _build_skeleton() -> void:
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	var main_vbox := VBoxContainer.new()
-	main_vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	main_vbox.add_theme_constant_override("separation", 8)
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	margin.add_theme_constant_override("margin_left", 14)
@@ -67,6 +95,9 @@ func _build_skeleton() -> void:
 	margin.add_theme_constant_override("margin_top", 10)
 	margin.add_theme_constant_override("margin_bottom", 10)
 	add_child(margin)
+
+	var main_vbox := VBoxContainer.new()
+	main_vbox.add_theme_constant_override("separation", 8)
 	margin.add_child(main_vbox)
 
 	# Top Bar
@@ -75,7 +106,7 @@ func _build_skeleton() -> void:
 	main_vbox.add_child(top_bar)
 
 	var top_hbox := HBoxContainer.new()
-	top_hbox.add_theme_constant_override("separation", 12)
+	top_hbox.add_theme_constant_override("separation", 10)
 	top_bar.add_child(top_hbox)
 
 	var title_lbl := Label.new()
@@ -96,6 +127,12 @@ func _build_skeleton() -> void:
 	UITheme.style_button(_undo_btn)
 	_undo_btn.pressed.connect(_on_undo_pressed)
 	top_hbox.add_child(_undo_btn)
+
+	_anim_btn = Button.new()
+	UITheme.style_button(_anim_btn)
+	_update_anim_btn_label()
+	_anim_btn.pressed.connect(_on_cycle_anim_speed)
+	top_hbox.add_child(_anim_btn)
 
 	_sfx_btn = Button.new()
 	_sfx_btn.text = "音效: 关" if SfxManager.muted else "音效: 开"
@@ -128,9 +165,9 @@ func _build_skeleton() -> void:
 	body.add_theme_constant_override("separation", 12)
 	main_vbox.add_child(body)
 
-	# Left: Players
+	# Left: Persistent 4 Player Panels
 	var left_panel := PanelContainer.new()
-	left_panel.custom_minimum_size = Vector2(280, 0)
+	left_panel.custom_minimum_size = Vector2(268, 0)
 	left_panel.add_theme_stylebox_override("panel", UITheme.make_panel_style())
 	body.add_child(left_panel)
 
@@ -144,11 +181,17 @@ func _build_skeleton() -> void:
 	p_hdr.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
 	left_v.add_child(p_hdr)
 
-	_players_box = VBoxContainer.new()
-	_players_box.add_theme_constant_override("separation", 8)
-	left_v.add_child(_players_box)
+	for _i in range(4):
+		var pp := PlayerPanel.new()
+		pp.visible = false
+		pp.detail_requested.connect(func(idx: int) -> void:
+			if state != null and idx >= 0 and idx < state.players.size():
+				_show_player_detail_modal(state.players[idx])
+		)
+		left_v.add_child(pp)
+		_player_panels.append(pp)
 
-	# Center: Masters + 3x4 Board + Reserved
+	# Center: Masters + 3x4 Responsive Board + Reserved
 	var center_v := VBoxContainer.new()
 	center_v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	center_v.add_theme_constant_override("separation", 8)
@@ -168,19 +211,49 @@ func _build_skeleton() -> void:
 	m_lbl.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
 	m_hbox.add_child(m_lbl)
 
-	_masters_row = HBoxContainer.new()
-	_masters_row.add_theme_constant_override("separation", 8)
-	m_hbox.add_child(_masters_row)
+	var masters_row := HBoxContainer.new()
+	masters_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	masters_row.add_theme_constant_override("separation", 8)
+	m_hbox.add_child(masters_row)
+
+	for _i in range(5):
+		var mv := MasterView.new()
+		mv.visible = false
+		masters_row.add_child(mv)
+		_master_slots.append(mv)
 
 	var board_panel := PanelContainer.new()
 	board_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	board_panel.add_theme_stylebox_override("panel", UITheme.make_panel_style())
 	center_v.add_child(board_panel)
 
-	_tiers_box = VBoxContainer.new()
-	_tiers_box.add_theme_constant_override("separation", 8)
-	_tiers_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	board_panel.add_child(_tiers_box)
+	var tiers_box := VBoxContainer.new()
+	tiers_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tiers_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tiers_box.add_theme_constant_override("separation", 8)
+	board_panel.add_child(tiers_box)
+
+	for tier in [3, 2, 1]:
+		var row := HBoxContainer.new()
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		row.add_theme_constant_override("separation", 8)
+		tiers_box.add_child(row)
+
+		var deck_btn := Button.new()
+		deck_btn.custom_minimum_size = Vector2(90, 130)
+		deck_btn.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		deck_btn.pressed.connect(func() -> void: _on_reserve_deck(tier))
+		row.add_child(deck_btn)
+		_deck_btns[tier] = deck_btn
+
+		_card_slots[tier] = []
+		for slot in range(4):
+			var cv := CardView.new()
+			cv.buy_requested.connect(_on_buy_requested)
+			cv.reserve_requested.connect(_on_reserve_board)
+			row.add_child(cv)
+			_card_slots[tier].append(cv)
 
 	var res_panel := PanelContainer.new()
 	res_panel.add_theme_stylebox_override("panel", UITheme.make_panel_style())
@@ -196,13 +269,27 @@ func _build_skeleton() -> void:
 	_reserved_title.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
 	res_hbox.add_child(_reserved_title)
 
-	_reserved_row = HBoxContainer.new()
-	_reserved_row.add_theme_constant_override("separation", 8)
-	res_hbox.add_child(_reserved_row)
+	var res_row := HBoxContainer.new()
+	res_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	res_row.add_theme_constant_override("separation", 8)
+	res_hbox.add_child(res_row)
 
-	# Right: Bank + Log
+	_reserved_empty_lbl = Label.new()
+	_reserved_empty_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_reserved_empty_lbl.add_theme_font_size_override("font_size", 13)
+	_reserved_empty_lbl.add_theme_color_override("font_color", UITheme.TEXT_MUTED)
+	res_row.add_child(_reserved_empty_lbl)
+
+	for _i in range(3):
+		var rcv := CardView.new()
+		rcv.visible = false
+		rcv.buy_requested.connect(_on_buy_requested)
+		res_row.add_child(rcv)
+		_reserved_slots.append(rcv)
+
+	# Right: Persistent Bank + Log
 	var right_panel := PanelContainer.new()
-	right_panel.custom_minimum_size = Vector2(270, 0)
+	right_panel.custom_minimum_size = Vector2(268, 0)
 	right_panel.add_theme_stylebox_override("panel", UITheme.make_panel_style())
 	body.add_child(right_panel)
 
@@ -216,9 +303,56 @@ func _build_skeleton() -> void:
 	bank_hdr.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
 	right_v.add_child(bank_hdr)
 
-	_bank_box = VBoxContainer.new()
-	_bank_box.add_theme_constant_override("separation", 6)
-	right_v.add_child(_bank_box)
+	for g in GemTypes.ALL_GEMS:
+		var chip_btn := Button.new()
+		chip_btn.custom_minimum_size = Vector2(0, 44)
+		chip_btn.pressed.connect(func() -> void: _on_bank_gem_clicked(g))
+		right_v.add_child(chip_btn)
+
+		var pad := MarginContainer.new()
+		pad.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pad.add_theme_constant_override("margin_left", 8)
+		pad.add_theme_constant_override("margin_right", 10)
+		chip_btn.add_child(pad)
+
+		var row := HBoxContainer.new()
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_theme_constant_override("separation", 10)
+		pad.add_child(row)
+
+		var icon := TextureRect.new()
+		icon.texture = UITheme.gem_icon(g)
+		icon.custom_minimum_size = Vector2(30, 30)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(icon)
+
+		var name_lbl := Label.new()
+		name_lbl.text = GemTypes.gem_name(g)
+		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		name_lbl.add_theme_font_size_override("font_size", 14)
+		name_lbl.add_theme_color_override("font_color", UITheme.TEXT_MAIN)
+		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(name_lbl)
+
+		var sel_lbl := Label.new()
+		sel_lbl.visible = false
+		sel_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		sel_lbl.add_theme_font_size_override("font_size", 14)
+		sel_lbl.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
+		sel_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(sel_lbl)
+
+		var cnt_lbl := Label.new()
+		cnt_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		cnt_lbl.add_theme_font_size_override("font_size", 13)
+		cnt_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(cnt_lbl)
+
+		_bank_slots[g] = {"btn": chip_btn, "sel_lbl": sel_lbl, "cnt_lbl": cnt_lbl}
 
 	_selection_lbl = Label.new()
 	_selection_lbl.text = "未选材料"
@@ -233,6 +367,7 @@ func _build_skeleton() -> void:
 
 	_confirm_take_btn = Button.new()
 	_confirm_take_btn.text = "确认拿取"
+	_confirm_take_btn.custom_minimum_size = Vector2(0, 38)
 	_confirm_take_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UITheme.style_button(_confirm_take_btn, Color("295439"), UITheme.AFFORD_GREEN)
 	_confirm_take_btn.pressed.connect(_on_confirm_take_pressed)
@@ -240,6 +375,7 @@ func _build_skeleton() -> void:
 
 	_clear_take_btn = Button.new()
 	_clear_take_btn.text = "清空"
+	_clear_take_btn.custom_minimum_size = Vector2(64, 38)
 	UITheme.style_button(_clear_take_btn)
 	_clear_take_btn.pressed.connect(func() -> void:
 		_selected_gems.clear()
@@ -259,6 +395,48 @@ func _build_skeleton() -> void:
 	_log_lbl.add_theme_font_size_override("normal_font_size", 12)
 	_log_lbl.add_theme_color_override("default_color", UITheme.TEXT_MUTED)
 	right_v.add_child(_log_lbl)
+
+	# FX Overlay (non-blocking)
+	_fx = FxLayer.new()
+	add_child(_fx)
+
+	# Hot-seat privacy curtain
+	_curtain_overlay = ColorRect.new()
+	_curtain_overlay.color = Color("120D0B", 0.96)
+	_curtain_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_curtain_overlay.visible = false
+	add_child(_curtain_overlay)
+
+	var curtain_center := CenterContainer.new()
+	curtain_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_curtain_overlay.add_child(curtain_center)
+
+	var curtain_panel := PanelContainer.new()
+	curtain_panel.custom_minimum_size = Vector2(380, 190)
+	curtain_panel.add_theme_stylebox_override("panel", UITheme.make_panel_style(Color("241B17"), UITheme.GOLD_ACCENT, 12, 2))
+	curtain_center.add_child(curtain_panel)
+
+	var curtain_v := VBoxContainer.new()
+	curtain_v.alignment = BoxContainer.ALIGNMENT_CENTER
+	curtain_v.add_theme_constant_override("separation", 16)
+	curtain_panel.add_child(curtain_v)
+
+	_curtain_lbl = Label.new()
+	_curtain_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_curtain_lbl.add_theme_font_size_override("font_size", 20)
+	_curtain_lbl.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
+	curtain_v.add_child(_curtain_lbl)
+
+	var curtain_btn := Button.new()
+	curtain_btn.text = "准备好了"
+	curtain_btn.custom_minimum_size = Vector2(160, 44)
+	curtain_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	UITheme.style_button(curtain_btn, Color("295439"), UITheme.AFFORD_GREEN)
+	curtain_btn.pressed.connect(func() -> void:
+		_curtain_overlay.visible = false
+		SfxManager.play_click()
+	)
+	curtain_v.add_child(curtain_btn)
 
 	# Modal Overlay
 	_modal_overlay = ColorRect.new()
@@ -282,6 +460,29 @@ func _build_skeleton() -> void:
 
 func _is_human_turn() -> bool:
 	return state != null and state.phase == GameState.TurnPhase.ACTION and not state.current_player().is_ai
+
+func _human_count() -> int:
+	var n := 0
+	for p in state.players:
+		if not p.is_ai:
+			n += 1
+	return n
+
+func _update_anim_btn_label() -> void:
+	var spd := float(Settings.get_value("anim_speed"))
+	if spd <= 0.01:
+		_anim_btn.text = "动画: 关"
+	elif spd >= 1.5:
+		_anim_btn.text = "动画: 快"
+	else:
+		_anim_btn.text = "动画: 正常"
+
+func _on_cycle_anim_speed() -> void:
+	var spd := float(Settings.get_value("anim_speed"))
+	var next := 2.0 if (spd > 0.5 and spd < 1.5) else (0.0 if spd >= 1.5 else 1.0)
+	Settings.set_value("anim_speed", next)
+	_update_anim_btn_label()
+	SfxManager.play_click()
 
 func _refresh_all() -> void:
 	if state == null:
@@ -315,8 +516,11 @@ func _refresh_all() -> void:
 
 	if not cur.is_ai and state.phase == GameState.TurnPhase.ACTION:
 		SaveManager.save_autosave(state)
+		if _human_count() >= 2 and cur.index != _last_human_idx:
+			_last_human_idx = cur.index
+			_curtain_lbl.text = "请将设备交给「%s」" % cur.name
+			_curtain_overlay.visible = true
 
-	# Handle modal phases
 	if state.phase == GameState.TurnPhase.DISCARD_CHIPS and not cur.is_ai:
 		_show_discard_modal()
 	elif state.phase == GameState.TurnPhase.CHOOSE_MASTER and not cur.is_ai:
@@ -332,225 +536,82 @@ func _refresh_all() -> void:
 		_modal_overlay.visible = false
 
 func _refresh_players() -> void:
-	for c in _players_box.get_children():
-		c.queue_free()
-
-	for p in state.players:
-		var is_cur := (p.index == state.current_player_idx) and (state.phase != GameState.TurnPhase.GAME_OVER)
-		var card := PanelContainer.new()
-		card.add_theme_stylebox_override("panel", UITheme.make_panel_style(
-			Color("33261F") if is_cur else Color("1F1714"),
-			UITheme.GOLD_ACCENT if is_cur else Color("4A3B31"),
-			8,
-			2 if is_cur else 1
-		))
-		_players_box.add_child(card)
-
-		var v := VBoxContainer.new()
-		v.add_theme_constant_override("separation", 4)
-		card.add_child(v)
-
-		var hdr := HBoxContainer.new()
-		v.add_child(hdr)
-
-		var n_lbl := Label.new()
-		n_lbl.text = "%s%s" % [p.name, " [AI]" if p.is_ai else ""]
-		n_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		n_lbl.add_theme_font_size_override("font_size", 14)
-		n_lbl.add_theme_color_override("font_color", UITheme.GOLD_ACCENT if is_cur else UITheme.TEXT_MAIN)
-		hdr.add_child(n_lbl)
-
-		var sc_lbl := Label.new()
-		sc_lbl.text = "%d 分" % p.get_score()
-		sc_lbl.add_theme_font_size_override("font_size", 15)
-		sc_lbl.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
-		hdr.add_child(sc_lbl)
-
-		var detail_btn := Button.new()
-		detail_btn.text = "藏品"
-		detail_btn.add_theme_font_size_override("font_size", 11)
-		UITheme.style_button(detail_btn, Color("2A201A"))
-		detail_btn.pressed.connect(func() -> void: _show_player_detail_modal(p))
-		hdr.add_child(detail_btn)
-
-		var sub_lbl := Label.new()
-		sub_lbl.text = "已制 %d 件 · 留存 %d · 名士 %d · 材料 %d/10" % [
-			p.purchased.size(), p.reserved.size(), p.masters.size(), p.total_chips()
-		]
-		sub_lbl.add_theme_font_size_override("font_size", 11)
-		sub_lbl.add_theme_color_override("font_color", UITheme.TEXT_MUTED)
-		v.add_child(sub_lbl)
-
-		# Discounts + Chips compact badges
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 4)
-		v.add_child(row)
-
-		for g in GemTypes.ALL_GEMS:
-			var chip_n := int(p.chips[g])
-			var disc_n := int(p.discounts.get(g, 0))
-			if chip_n == 0 and disc_n == 0:
-				continue
-			var badge := PanelContainer.new()
-			badge.add_theme_stylebox_override("panel", UITheme.make_chip_style(g, 5, 1))
-			var b_lbl := Label.new()
-			if g == GemTypes.GOLD:
-				b_lbl.text = "金%d" % chip_n
-			elif disc_n > 0:
-				b_lbl.text = "%s%d(+%d)" % [GemTypes.gem_short(g), chip_n, disc_n]
-			else:
-				b_lbl.text = "%s%d" % [GemTypes.gem_short(g), chip_n]
-			b_lbl.add_theme_font_size_override("font_size", 11)
-			b_lbl.add_theme_color_override("font_color", GemTypes.gem_text_color(g))
-			badge.add_child(b_lbl)
-			row.add_child(badge)
+	for i in range(_player_panels.size()):
+		var pp := _player_panels[i]
+		if i < state.players.size():
+			pp.visible = true
+			var is_cur := (i == state.current_player_idx) and (state.phase != GameState.TurnPhase.GAME_OVER)
+			pp.update_player(state.players[i], is_cur)
+		else:
+			pp.visible = false
 
 func _refresh_masters() -> void:
-	for c in _masters_row.get_children():
-		c.queue_free()
-	for m in state.masters:
-		var mv := MasterView.new()
-		mv.setup(m, false)
-		_masters_row.add_child(mv)
+	for i in range(_master_slots.size()):
+		var mv := _master_slots[i]
+		if i < state.masters.size():
+			mv.visible = true
+			mv.setup(state.masters[i], false)
+		else:
+			mv.visible = false
 
 func _refresh_board() -> void:
-	for c in _tiers_box.get_children():
-		c.queue_free()
-
 	var human_turn := _is_human_turn()
 	var viewer := state.current_player()
 
 	for tier in [3, 2, 1]:
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		_tiers_box.add_child(row)
-
-		# Deck pile button (blind reserve)
-		var deck_btn := Button.new()
+		var deck_btn: Button = _deck_btns[tier]
 		var rem: int = state.decks[tier].size()
-		deck_btn.custom_minimum_size = Vector2(96, 154)
 		deck_btn.text = "%s阶\n图谱\n(%d)" % [["", "一", "二", "三"][tier], rem]
 		deck_btn.disabled = not (human_turn and rem > 0 and viewer.reserved.size() < GameState.MAX_RESERVED)
 		UITheme.style_button(deck_btn, UITheme.tier_bg_color(tier), UITheme.GOLD_DIM)
-		deck_btn.pressed.connect(func() -> void:
-			_on_reserve_deck(tier)
-		)
-		row.add_child(deck_btn)
 
+		var slots: Array = _card_slots[tier]
 		for slot in range(4):
-			var cv := CardView.new()
+			var cv: CardView = slots[slot]
 			cv.setup_board_card(state.board[tier][slot], tier, slot, viewer, human_turn)
-			cv.buy_requested.connect(_on_buy_requested)
-			cv.reserve_requested.connect(_on_reserve_board)
-			row.add_child(cv)
 
 func _refresh_reserved() -> void:
-	for c in _reserved_row.get_children():
-		c.queue_free()
-
 	var viewer := state.current_player()
 	var human_turn := _is_human_turn()
 	_reserved_title.text = "%s\n留存(%d/3)" % [viewer.name, viewer.reserved.size()]
 
+	var show_cards := (not viewer.is_ai) and (not viewer.reserved.is_empty())
+	_reserved_empty_lbl.visible = not show_cards
 	if viewer.reserved.is_empty():
-		var lbl := Label.new()
-		lbl.text = "暂无留存图谱（点击展示区卡牌“留存”可锁定图谱并获赠 1 枚赤金）"
-		lbl.add_theme_font_size_override("font_size", 13)
-		lbl.add_theme_color_override("font_color", UITheme.TEXT_MUTED)
-		_reserved_row.add_child(lbl)
-		return
+		_reserved_empty_lbl.text = "暂无留存图谱（点击展示区卡牌“留存”可锁定图谱并获赠 1 枚赤金）"
+	elif viewer.is_ai:
+		_reserved_empty_lbl.text = "%s 留存了 %d 张图谱（暗置）" % [viewer.name, viewer.reserved.size()]
 
-	if viewer.is_ai:
-		var lbl := Label.new()
-		lbl.text = "%s 留存了 %d 张图谱（暗置）" % [viewer.name, viewer.reserved.size()]
-		lbl.add_theme_font_size_override("font_size", 13)
-		lbl.add_theme_color_override("font_color", UITheme.TEXT_MUTED)
-		_reserved_row.add_child(lbl)
-		return
-
-	for i in range(viewer.reserved.size()):
-		var cv := CardView.new()
-		cv.setup_reserved_card(viewer.reserved[i], i, viewer, human_turn)
-		cv.buy_requested.connect(_on_buy_requested)
-		_reserved_row.add_child(cv)
+	for i in range(_reserved_slots.size()):
+		var rcv := _reserved_slots[i]
+		if show_cards and i < viewer.reserved.size():
+			rcv.visible = true
+			rcv.setup_reserved_card(viewer.reserved[i], i, viewer, human_turn)
+		else:
+			rcv.visible = false
 
 func _refresh_bank_and_selection() -> void:
-	for c in _bank_box.get_children():
-		c.queue_free()
-
 	var human_turn := _is_human_turn()
 
 	for g in GemTypes.ALL_GEMS:
+		var slot_d: Dictionary = _bank_slots[g]
+		var chip_btn: Button = slot_d["btn"]
+		var sel_lbl: Label = slot_d["sel_lbl"]
+		var cnt_lbl: Label = slot_d["cnt_lbl"]
 		var amt := int(state.bank[g])
 		var sel_cnt: int = _selected_gems.count(g)
 		var can_pick := (g != GemTypes.GOLD) and human_turn and _can_add_to_selection(g)
 
-		var chip_btn := Button.new()
-		chip_btn.custom_minimum_size = Vector2(0, 44)
 		chip_btn.disabled = (g == GemTypes.GOLD) or (not can_pick and sel_cnt == 0)
 		var bg_col := Color("3A2C21") if sel_cnt > 0 else Color("241C17")
 		var bd_col := UITheme.GOLD_ACCENT if sel_cnt > 0 else UITheme.GOLD_DIM
 		UITheme.style_button(chip_btn, bg_col, bd_col)
-		if can_pick:
-			chip_btn.pressed.connect(func() -> void:
-				_selected_gems.append(g)
-				SfxManager.play_click()
-				_refresh_bank_and_selection()
-			)
-		elif sel_cnt > 0 and human_turn:
-			chip_btn.pressed.connect(func() -> void:
-				_selected_gems.erase(g)
-				SfxManager.play_click()
-				_refresh_bank_and_selection()
-			)
-		_bank_box.add_child(chip_btn)
 
-		var row := HBoxContainer.new()
-		row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_theme_constant_override("separation", 10)
-		var pad := MarginContainer.new()
-		pad.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		pad.add_theme_constant_override("margin_left", 8)
-		pad.add_theme_constant_override("margin_right", 10)
-		chip_btn.add_child(pad)
-		pad.add_child(row)
-
-		var icon := TextureRect.new()
-		icon.texture = UITheme.gem_icon(g)
-		icon.custom_minimum_size = Vector2(30, 30)
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(icon)
-
-		var name_lbl := Label.new()
-		name_lbl.text = GemTypes.gem_name(g)
-		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		name_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		name_lbl.add_theme_font_size_override("font_size", 14)
-		name_lbl.add_theme_color_override("font_color", UITheme.TEXT_MAIN)
-		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(name_lbl)
-
+		sel_lbl.visible = sel_cnt > 0
 		if sel_cnt > 0:
-			var sel_lbl := Label.new()
 			sel_lbl.text = "+%d" % sel_cnt
-			sel_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			sel_lbl.add_theme_font_size_override("font_size", 14)
-			sel_lbl.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
-			sel_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			row.add_child(sel_lbl)
-
-		var cnt_lbl := Label.new()
 		cnt_lbl.text = "×%d" % amt if g != GemTypes.GOLD else "×%d (留存)" % amt
-		cnt_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		cnt_lbl.add_theme_font_size_override("font_size", 13)
 		cnt_lbl.add_theme_color_override("font_color", UITheme.TEXT_MUTED if g == GemTypes.GOLD else UITheme.TEXT_MAIN)
-		cnt_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(cnt_lbl)
 
 	if _selected_gems.is_empty():
 		_selection_lbl.text = "点击上方材料：拿 3 种不同，或双击同种（余量 ≥ 4）"
@@ -561,6 +622,18 @@ func _refresh_bank_and_selection() -> void:
 			names.append(GemTypes.gem_name(g))
 		_selection_lbl.text = "已选：%s" % " + ".join(names)
 		_confirm_take_btn.disabled = not (human_turn and _is_selection_valid())
+
+func _on_bank_gem_clicked(g: String) -> void:
+	if not _is_human_turn() or g == GemTypes.GOLD:
+		return
+	if _can_add_to_selection(g):
+		_selected_gems.append(g)
+		SfxManager.play_click()
+		_refresh_bank_and_selection()
+	elif _selected_gems.has(g):
+		_selected_gems.erase(g)
+		SfxManager.play_click()
+		_refresh_bank_and_selection()
 
 func _can_add_to_selection(g: String) -> bool:
 	var bank_amt := int(state.bank.get(g, 0))
@@ -574,7 +647,7 @@ func _can_add_to_selection(g: String) -> bool:
 		return true
 	if _selected_gems.size() == 2:
 		if _selected_gems[0] == _selected_gems[1]:
-			return false # already taking 2 same
+			return false
 		return not _selected_gems.has(g)
 	return false
 
@@ -582,6 +655,58 @@ func _is_selection_valid() -> bool:
 	if _selected_gems.size() == 2 and _selected_gems[0] == _selected_gems[1]:
 		return bool(RulesEngine.can_take_two_same(state, _selected_gems[0])["ok"])
 	return bool(RulesEngine.can_take_different(state, _selected_gems)["ok"])
+
+func _on_events_applied(_action: GameAction, evs: Array) -> void:
+	EventBus.game_events.emit(evs)
+	if _fx == null:
+		return
+	for ev in evs:
+		match str(ev.get("type", "")):
+			"take":
+				var pi := int(ev.get("player", 0))
+				var target_pos := _player_center(pi)
+				var gems: Dictionary = ev.get("gems", {})
+				var delay := 0.0
+				for g in gems.keys():
+					for _k in range(int(gems[g])):
+						_fx.fly_chip(str(g), _bank_center(str(g)), target_pos, delay)
+						delay += 0.07
+			"reserve":
+				var pi := int(ev.get("player", 0))
+				if bool(ev.get("gold", false)):
+					_fx.fly_chip(GemTypes.GOLD, _bank_center(GemTypes.GOLD), _player_center(pi), 0.0)
+			"buy":
+				var pi := int(ev.get("player", 0))
+				var pts := int(ev.get("prestige", 0))
+				if pts > 0:
+					_fx.float_text("+%d 声望" % pts, _player_center(pi), UITheme.GOLD_ACCENT)
+			"refill":
+				var tier := int(ev.get("tier", 1))
+				var slot := int(ev.get("slot", 0))
+				if _card_slots.has(tier) and slot >= 0 and slot < 4:
+					_fx.pulse_control(_card_slots[tier][slot])
+			"master":
+				var pi := int(ev.get("player", 0))
+				var m_name := ""
+				for m in state.players[pi].masters:
+					if m.id == str(ev.get("master_id", "")):
+						m_name = "%s·%s" % [m.name, m.title]
+						break
+				_fx.show_banner("名士「%s」亲临 %s 的雅集 (+%d 声望)" % [m_name, state.players[pi].name, int(ev.get("prestige", 3))])
+			"final_round":
+				_fx.show_banner("【终局钟鸣】%s 率先达到 %d 声望，本轮结束后结算！" % [state.players[int(ev["player"])].name, int(ev["score"])])
+
+func _player_center(idx: int) -> Vector2:
+	if idx >= 0 and idx < _player_panels.size() and _player_panels[idx].visible:
+		var p := _player_panels[idx]
+		return p.global_position + p.size * 0.5
+	return Vector2(140, 200)
+
+func _bank_center(gem: String) -> Vector2:
+	if _bank_slots.has(gem):
+		var b: Button = _bank_slots[gem]["btn"]
+		return b.global_position + Vector2(36, b.size.y * 0.5)
+	return Vector2(1260, 260)
 
 func _on_undo_pressed() -> void:
 	if _controller == null:
@@ -654,7 +779,30 @@ func _on_ai_timer_timeout() -> void:
 	if state == null or state.phase == GameState.TurnPhase.GAME_OVER:
 		return
 	if state.current_player().is_ai:
+		var prev_hist := state.history.size()
 		AIAgent.take_turn_step(state)
+		if state.history.size() > prev_hist:
+			var act := GameAction.from_dict(state.history.back())
+			# Trigger visual/SFX feedback for AI actions too
+			var evs: Array = []
+			match act.type:
+				GameAction.Type.TAKE_DIFFERENT:
+					var g_map := {}
+					for g in act.params.get("gems", []):
+						g_map[g] = 1
+					evs.append({"type": "take", "player": act.player, "gems": g_map})
+					SfxManager.play_take_chip(g_map.size())
+				GameAction.Type.TAKE_TWO:
+					evs.append({"type": "take", "player": act.player, "gems": {str(act.params.get("gem", "")): 2}})
+					SfxManager.play_take_chip(2)
+				GameAction.Type.BUY_BOARD:
+					evs.append({"type": "refill", "tier": int(act.params["tier"]), "slot": int(act.params["slot"])})
+					SfxManager.play_buy(1)
+				GameAction.Type.BUY_RESERVED:
+					SfxManager.play_buy(1)
+				GameAction.Type.RESERVE_BOARD, GameAction.Type.RESERVE_DECK:
+					SfxManager.play_reserve()
+			_on_events_applied(act, evs)
 		_refresh_all()
 		_schedule_ai_if_needed()
 
@@ -706,6 +854,7 @@ func _show_discard_modal() -> void:
 
 		var minus_b := Button.new()
 		minus_b.text = "-"
+		minus_b.custom_minimum_size = Vector2(36, 32)
 		minus_b.disabled = ret <= 0
 		UITheme.style_button(minus_b)
 		minus_b.pressed.connect(func() -> void:
@@ -723,6 +872,7 @@ func _show_discard_modal() -> void:
 
 		var plus_b := Button.new()
 		plus_b.text = "+"
+		plus_b.custom_minimum_size = Vector2(36, 32)
 		plus_b.disabled = ret >= owned or chosen_sum >= excess
 		UITheme.style_button(plus_b)
 		plus_b.pressed.connect(func() -> void:
@@ -733,6 +883,7 @@ func _show_discard_modal() -> void:
 
 	var ok_btn := Button.new()
 	ok_btn.text = "确认归还"
+	ok_btn.custom_minimum_size = Vector2(0, 40)
 	ok_btn.disabled = chosen_sum != excess
 	UITheme.style_button(ok_btn, Color("295439"), UITheme.AFFORD_GREEN)
 	ok_btn.pressed.connect(func() -> void:
@@ -799,6 +950,7 @@ func _show_game_over_modal() -> void:
 
 	var replay_btn := Button.new()
 	replay_btn.text = "再开一局"
+	replay_btn.custom_minimum_size = Vector2(120, 40)
 	UITheme.style_button(replay_btn, Color("295439"), UITheme.AFFORD_GREEN)
 	replay_btn.pressed.connect(func() -> void:
 		_modal_overlay.visible = false
@@ -808,6 +960,7 @@ func _show_game_over_modal() -> void:
 
 	var menu_btn := Button.new()
 	menu_btn.text = "返回主阁"
+	menu_btn.custom_minimum_size = Vector2(120, 40)
 	UITheme.style_button(menu_btn)
 	menu_btn.pressed.connect(func() -> void:
 		_modal_overlay.visible = false
@@ -832,7 +985,8 @@ func _show_rules_modal() -> void:
 		+ "   · 打造 1 件展示区或已留存的器物，获得对应门类永久折扣与声望。\n"
 		+ "2. 手中材料上限 10 枚，超出须在回合末归还多余部分。\n"
 		+ "3. 永久折扣达到名士要求时，名士自动亲临雅集（+3 声望）。\n"
-		+ "4. 任意匠师达到目标声望（默认 15 分）触发终局轮，该轮结束后分高者胜（同分比制成器物少者胜）。"
+		+ "4. 任意匠师达到目标声望（默认 15 分）触发终局轮，该轮结束后分高者胜（同分比制成器物少者胜）。\n"
+		+ "5. 快捷键：Enter 确认拿取 · Ctrl+Z 悔棋 · Esc 清空选择。"
 	)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD
 	body.add_theme_font_size_override("font_size", 13)
@@ -841,6 +995,7 @@ func _show_rules_modal() -> void:
 
 	var close_btn := Button.new()
 	close_btn.text = "知晓"
+	close_btn.custom_minimum_size = Vector2(120, 38)
 	UITheme.style_button(close_btn, Color("295439"), UITheme.AFFORD_GREEN)
 	close_btn.pressed.connect(func() -> void: _modal_overlay.visible = false)
 	_modal_content.add_child(close_btn)
@@ -882,6 +1037,7 @@ func _show_player_detail_modal(p: PlayerState) -> void:
 
 	var close_btn := Button.new()
 	close_btn.text = "关闭"
+	close_btn.custom_minimum_size = Vector2(120, 38)
 	UITheme.style_button(close_btn)
 	close_btn.pressed.connect(func() -> void: _modal_overlay.visible = false)
 	_modal_content.add_child(close_btn)
