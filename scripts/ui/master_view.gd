@@ -68,11 +68,11 @@ func _ensure_built() -> void:
 		req_row.add_child(pip)
 		_req_pips[g] = {"panel": pip, "lbl": lbl}
 
-func setup(m: CardData.MasterTile, is_clickable: bool = false) -> void:
+func setup(m: CardData.MasterTile, is_clickable: bool = false, viewer: PlayerState = null) -> void:
 	_ensure_built()
 	master_data = m
 	clickable = is_clickable
-	add_theme_stylebox_override("panel", UITheme.make_panel_style(Color("2D211B"), UITheme.GOLD_ACCENT if is_clickable else UITheme.GOLD_DIM, 8, 2, 5))
+	add_theme_stylebox_override("panel", UITheme.make_panel_style(Color("2D211B", 0.92), UITheme.GOLD_ACCENT if is_clickable else UITheme.GOLD_DIM, 8, 2, 5))
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if is_clickable else Control.CURSOR_ARROW
 
 	_name_lbl.text = m.name
@@ -85,7 +85,17 @@ func setup(m: CardData.MasterTile, is_clickable: bool = false) -> void:
 		var lbl: Label = _req_pips[g]["lbl"]
 		pip.visible = req > 0
 		if req > 0:
-			lbl.text = "%s%d" % [GemTypes.gem_short(g), req]
+			var sb := UITheme.make_chip_style(g, 5, 1)
+			if viewer != null:
+				var cur := int(viewer.discounts.get(g, 0))
+				if cur >= req:
+					lbl.text = "%s✓" % GemTypes.gem_short(g)
+					sb.border_color = UITheme.AFFORD_GREEN
+				else:
+					lbl.text = "%s%d/%d" % [GemTypes.gem_short(g), cur, req]
+			else:
+				lbl.text = "%s%d" % [GemTypes.gem_short(g), req]
+			pip.add_theme_stylebox_override("panel", sb)
 
 func _gui_input(event: InputEvent) -> void:
 	if clickable and master_data != null and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:

@@ -1,8 +1,7 @@
 class_name CardView
 extends PanelContainer
 
-signal buy_requested(tier: int, slot: int, reserved_idx: int)
-signal reserve_requested(tier: int, slot: int)
+signal card_tapped(card_view: CardView)
 
 var card: CardData.CraftCard
 var tier: int = 1
@@ -11,6 +10,7 @@ var reserved_idx: int = -1
 var is_affordable: bool = false
 var can_reserve: bool = false
 var interactive: bool = true
+var is_selected: bool = false
 
 var _built: bool = false
 var _is_res_mode: bool = false
@@ -23,12 +23,12 @@ var _hover_tw: Tween
 var _root: Control
 var _empty_lbl: Label
 var _prestige_lbl: Label
+var _tier_tag: Label
 var _bonus_icon: TextureRect
 var _title_lbl: Label
-var _cost_pips: Dictionary = {} # gem -> {panel, lbl}
-var _hover_bar: HBoxContainer
-var _buy_btn: Button
-var _res_btn: Button
+var _status_pill: PanelContainer
+var _status_lbl: Label
+var _cost_pips: Dictionary = {} # gem -> {row, panel, lbl, hint_lbl}
 
 func _ensure_built(is_res: bool) -> void:
 	if _built:
@@ -36,15 +36,14 @@ func _ensure_built(is_res: bool) -> void:
 	_built = true
 	_is_res_mode = is_res
 	clip_contents = true
+	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 	if is_res:
-		# Compact portrait card for reserved hand
-		custom_minimum_size = Vector2(96, 134)
+		custom_minimum_size = Vector2(74, 102)
 		size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	else:
-		# Classic ~5:7 portrait physical card proportions
-		custom_minimum_size = Vector2(118, 166)
+		custom_minimum_size = Vector2(110, 154)
 		size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
@@ -64,7 +63,7 @@ func _ensure_built(is_res: bool) -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_PASS
 	add_child(_root)
 
-	# Full-bleed gongbi artwork
+	# Full-bleed tier-specific gongbi artwork
 	_art_rect = TextureRect.new()
 	_art_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_art_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -77,14 +76,12 @@ func _ensure_built(is_res: bool) -> void:
 		_art_rect.material = _art_mat
 	_root.add_child(_art_rect)
 
-	# Subtle vignette scrim for readability
 	_art_scrim = ColorRect.new()
-	_art_scrim.color = Color(0.06, 0.04, 0.03, 0.25)
+	_art_scrim.color = Color(0.05, 0.04, 0.03, 0.22)
 	_art_scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_art_scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_art_scrim)
 
-	# Ornate tier filigree frame
 	_pattern_rect = TextureRect.new()
 	_pattern_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_pattern_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -92,20 +89,20 @@ func _ensure_built(is_res: bool) -> void:
 	_pattern_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_pattern_rect)
 
-	# Top translucent banner (Prestige left, Gem icon right)
+	# Top translucent banner (Prestige left, Tier center, Gem icon right)
 	var top_band := ColorRect.new()
-	top_band.color = Color(0.08, 0.06, 0.05, 0.68)
+	top_band.color = Color(0.08, 0.06, 0.05, 0.72)
 	top_band.anchor_left = 0.0
 	top_band.anchor_right = 1.0
 	top_band.anchor_top = 0.0
-	top_band.offset_bottom = 34.0
+	top_band.offset_bottom = 30.0 if is_res else 34.0
 	top_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(top_band)
 
 	_prestige_lbl = Label.new()
-	_prestige_lbl.position = Vector2(8, 1)
-	_prestige_lbl.size = Vector2(30, 32)
-	_prestige_lbl.add_theme_font_size_override("font_size", 22 if not is_res else 18)
+	_prestige_lbl.position = Vector2(7, 0)
+	_prestige_lbl.size = Vector2(28, 32)
+	_prestige_lbl.add_theme_font_size_override("font_size", 18 if is_res else 22)
 	_prestige_lbl.add_theme_color_override("font_color", Color("F8E7C0"))
 	_prestige_lbl.add_theme_color_override("font_shadow_color", Color.BLACK)
 	_prestige_lbl.add_theme_constant_override("shadow_offset_x", 1)
@@ -113,46 +110,64 @@ func _ensure_built(is_res: bool) -> void:
 	_prestige_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_prestige_lbl)
 
+	_tier_tag = Label.new()
+	_tier_tag.anchor_left = 0.0
+	_tier_tag.anchor_right = 1.0
+	_tier_tag.offset_top = 6.0
+	_tier_tag.offset_bottom = 26.0
+	_tier_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_tier_tag.add_theme_font_size_override("font_size", 9 if is_res else 10)
+	_tier_tag.add_theme_color_override("font_color", Color("D7C4A1", 0.85))
+	_tier_tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_tier_tag)
+
 	_bonus_icon = TextureRect.new()
 	_bonus_icon.anchor_left = 1.0
 	_bonus_icon.anchor_right = 1.0
-	_bonus_icon.offset_left = -32.0
+	var ic_sz := 22.0 if is_res else 26.0
+	_bonus_icon.offset_left = -(ic_sz + 5.0)
 	_bonus_icon.offset_right = -5.0
 	_bonus_icon.offset_top = 4.0
-	_bonus_icon.offset_bottom = 30.0
+	_bonus_icon.offset_bottom = 4.0 + ic_sz
 	_bonus_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_bonus_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_bonus_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_bonus_icon)
 
-	# Subtle bottom dark ribbon for craft name legibility
+	# Bottom ribbon for craft name
 	var bot_band := ColorRect.new()
-	bot_band.color = Color(0.06, 0.04, 0.03, 0.62)
+	bot_band.color = Color(0.06, 0.04, 0.03, 0.68)
 	bot_band.anchor_left = 0.0
 	bot_band.anchor_right = 1.0
 	bot_band.anchor_top = 1.0
 	bot_band.anchor_bottom = 1.0
-	bot_band.offset_top = -24.0
+	bot_band.offset_top = -20.0 if is_res else -24.0
 	bot_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(bot_band)
 
-	# Bottom-left vertical stack of circular cost pips (authentic Splendor layout!)
+	# Bottom-left vertical stack of circular cost pips + per-gem check/shortage indicator
 	var cost_col := VBoxContainer.new()
 	cost_col.anchor_left = 0.0
 	cost_col.anchor_top = 1.0
 	cost_col.anchor_bottom = 1.0
-	cost_col.offset_left = 6.0
-	cost_col.offset_top = -124.0
-	cost_col.offset_right = 34.0
-	cost_col.offset_bottom = -6.0
+	cost_col.offset_left = 5.0
+	cost_col.offset_top = -126.0
+	cost_col.offset_right = 64.0
+	cost_col.offset_bottom = -5.0
 	cost_col.alignment = BoxContainer.ALIGNMENT_END
-	cost_col.add_theme_constant_override("separation", 3)
+	cost_col.add_theme_constant_override("separation", 2 if is_res else 3)
 	cost_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(cost_col)
 
 	for g in GemTypes.BASE_GEMS:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 3)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cost_col.add_child(row)
+
+		var pip_sz := 19 if is_res else 23
 		var pip := PanelContainer.new()
-		pip.custom_minimum_size = Vector2(24, 24)
+		pip.custom_minimum_size = Vector2(pip_sz, pip_sz)
 		pip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		pip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		var sb := UITheme.make_chip_style(g, 999, 2)
@@ -165,80 +180,82 @@ func _ensure_built(is_res: bool) -> void:
 		var c_lbl := Label.new()
 		c_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		c_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		c_lbl.add_theme_font_size_override("font_size", 12)
+		c_lbl.add_theme_font_size_override("font_size", 10 if is_res else 12)
 		c_lbl.add_theme_color_override("font_color", GemTypes.gem_text_color(g))
 		c_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		pip.add_child(c_lbl)
-		cost_col.add_child(pip)
-		_cost_pips[g] = {"panel": pip, "lbl": c_lbl}
+		row.add_child(pip)
 
-	# Subtle craft name ribbon at bottom-right
+		var hint_lbl := Label.new()
+		hint_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		hint_lbl.add_theme_font_size_override("font_size", 10 if is_res else 12)
+		hint_lbl.add_theme_color_override("font_outline_color", Color.BLACK)
+		hint_lbl.add_theme_constant_override("outline_size", 4)
+		hint_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(hint_lbl)
+
+		_cost_pips[g] = {"row": row, "panel": pip, "lbl": c_lbl, "hint": hint_lbl}
+
+	# Bottom-right craft title
 	_title_lbl = Label.new()
 	_title_lbl.anchor_left = 0.0
 	_title_lbl.anchor_right = 1.0
 	_title_lbl.anchor_top = 1.0
 	_title_lbl.anchor_bottom = 1.0
-	_title_lbl.offset_left = 34.0
-	_title_lbl.offset_right = -6.0
-	_title_lbl.offset_top = -24.0
-	_title_lbl.offset_bottom = -4.0
+	_title_lbl.offset_left = 28.0
+	_title_lbl.offset_right = -5.0
+	_title_lbl.offset_top = -20.0 if is_res else -23.0
+	_title_lbl.offset_bottom = -2.0
 	_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_title_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_title_lbl.clip_text = true
-	_title_lbl.add_theme_font_size_override("font_size", 12)
+	_title_lbl.add_theme_font_size_override("font_size", 10 if is_res else 11)
 	_title_lbl.add_theme_color_override("font_color", Color("F5E8CD"))
 	_title_lbl.add_theme_color_override("font_shadow_color", Color.BLACK)
 	_title_lbl.add_theme_constant_override("shadow_offset_x", 1)
 	_title_lbl.add_theme_constant_override("shadow_offset_y", 1)
+	_title_lbl.visible = not is_res
 	_title_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_title_lbl)
 
-	# Hover-only floating action pill (so idle cards look 100% like physical cards!)
-	_hover_bar = HBoxContainer.new()
-	_hover_bar.visible = false
-	_hover_bar.anchor_left = 0.0
-	_hover_bar.anchor_right = 1.0
-	_hover_bar.anchor_top = 0.5
-	_hover_bar.anchor_bottom = 0.5
-	_hover_bar.offset_left = 6.0
-	_hover_bar.offset_right = -6.0
-	_hover_bar.offset_top = -15.0
-	_hover_bar.offset_bottom = 15.0
-	_hover_bar.alignment = BoxContainer.ALIGNMENT_CENTER
-	_hover_bar.add_theme_constant_override("separation", 4)
-	_root.add_child(_hover_bar)
+	# Top-right/bottom-right affordability seal ("可造" or "需金×1")
+	_status_pill = PanelContainer.new()
+	_status_pill.visible = false
+	_status_pill.anchor_left = 1.0
+	_status_pill.anchor_right = 1.0
+	_status_pill.anchor_top = 0.0
+	_status_pill.offset_left = -52.0
+	_status_pill.offset_right = -4.0
+	_status_pill.offset_top = 34.0
+	_status_pill.offset_bottom = 52.0
+	_status_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_status_pill)
 
-	_buy_btn = Button.new()
-	_buy_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_buy_btn.custom_minimum_size = Vector2(0, 28)
-	_buy_btn.add_theme_font_size_override("font_size", 12)
-	_buy_btn.pressed.connect(func() -> void: buy_requested.emit(tier, slot, reserved_idx))
-	_hover_bar.add_child(_buy_btn)
+	_status_lbl = Label.new()
+	_status_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_status_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_status_lbl.add_theme_font_size_override("font_size", 10)
+	_status_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_status_pill.add_child(_status_lbl)
 
-	if not is_res:
-		_res_btn = Button.new()
-		_res_btn.text = "留存"
-		_res_btn.custom_minimum_size = Vector2(42, 28)
-		_res_btn.add_theme_font_size_override("font_size", 11)
-		_res_btn.pressed.connect(func() -> void: reserve_requested.emit(tier, slot))
-		_hover_bar.add_child(_res_btn)
-
-func setup_board_card(p_card: CardData.CraftCard, p_tier: int, p_slot: int, viewer: PlayerState, p_interactive: bool) -> void:
+func setup_board_card(p_card: CardData.CraftCard, p_tier: int, p_slot: int, viewer: PlayerState, p_interactive: bool, p_selected: bool = false) -> void:
 	_ensure_built(false)
 	card = p_card
 	tier = p_tier
 	slot = p_slot
 	reserved_idx = -1
 	interactive = p_interactive
+	is_selected = p_selected
 	_apply_data(viewer)
 
-func setup_reserved_card(p_card: CardData.CraftCard, p_res_idx: int, viewer: PlayerState, p_interactive: bool) -> void:
+func setup_reserved_card(p_card: CardData.CraftCard, p_res_idx: int, viewer: PlayerState, p_interactive: bool, p_selected: bool = false) -> void:
 	_ensure_built(true)
 	card = p_card
 	tier = p_card.tier
 	slot = -1
 	reserved_idx = p_res_idx
 	interactive = p_interactive
+	is_selected = p_selected
 	_apply_data(viewer)
 
 func _make_card_style(border_col: Color, border_w: int, shadow_sz: int, shadow_off: Vector2) -> StyleBoxFlat:
@@ -247,7 +264,7 @@ func _make_card_style(border_col: Color, border_w: int, shadow_sz: int, shadow_o
 	sb.border_color = border_col
 	sb.set_border_width_all(border_w)
 	sb.set_corner_radius_all(9)
-	sb.shadow_color = Color(0, 0, 0, 0.58)
+	sb.shadow_color = Color(0, 0, 0, 0.62)
 	sb.shadow_size = shadow_sz
 	sb.shadow_offset = shadow_off
 	sb.content_margin_left = 0
@@ -261,6 +278,8 @@ func _apply_data(viewer: PlayerState) -> void:
 		_root.visible = false
 		_empty_lbl.visible = true
 		tooltip_text = ""
+		scale = Vector2.ONE
+		z_index = 0
 		add_theme_stylebox_override("panel", _make_card_style(Color("3D3028", 0.5), 1, 2, Vector2(1, 2)))
 		return
 
@@ -271,48 +290,70 @@ func _apply_data(viewer: PlayerState) -> void:
 	is_affordable = bool(pay_info["valid"])
 	can_reserve = (not _is_res_mode) and viewer != null and viewer.reserved.size() < GameState.MAX_RESERVED
 
-	var tip_lines: Array[String] = ["%s（%s·%d 声望）" % [card.name, GemTypes.gem_name(card.bonus), card.prestige]]
-	if viewer != null:
-		if is_affordable:
-			var gn := int(pay_info["gold_needed"])
-			tip_lines.append("点击「打造」" + ("（需补赤金 ×%d）" % gn if gn > 0 else "（材料充足）"))
-		else:
-			var sf: Dictionary = pay_info.get("shortfall", {})
-			var parts: Array[String] = []
-			for g in GemTypes.BASE_GEMS:
-				var need := int(sf.get(g, 0))
-				if need > 0:
-					parts.append("%s×%d" % [GemTypes.gem_name(g), need])
-			tip_lines.append("尚差：" + ("、".join(parts) if not parts.is_empty() else "无") + "（可抵赤金 %d 枚）" % int(viewer.chips.get(GemTypes.GOLD, 0)))
-	tooltip_text = "\n".join(tip_lines)
+	var border_col := UITheme.GOLD_ACCENT if is_selected else (UITheme.AFFORD_GREEN if (is_affordable and interactive) else Color("C8B288", 0.72))
+	var bw := 3 if is_selected else 2
+	add_theme_stylebox_override("panel", _make_card_style(border_col, bw, 12 if is_selected else 7, Vector2(4, 8) if is_selected else Vector2(3, 5)))
+	z_index = 15 if is_selected else 0
+	pivot_offset = size * 0.5
+	scale = Vector2(1.07, 1.07) if is_selected else Vector2.ONE
 
-	var border_col := UITheme.AFFORD_GREEN if (is_affordable and interactive) else Color("C8B288", 0.72)
-	add_theme_stylebox_override("panel", _make_card_style(border_col, 2, 7, Vector2(3, 5)))
-
-	_art_rect.texture = UITheme.card_art(card.bonus)
+	_art_rect.texture = UITheme.card_art(card.bonus, card.tier)
 	if _art_mat != null:
-		_art_mat.set_shader_parameter("foil_strength", 0.35 if (is_affordable and interactive) else 0.0)
+		_art_mat.set_shader_parameter("foil_strength", 0.75 if is_selected else (0.35 if (is_affordable and interactive) else 0.0))
 	_pattern_rect.texture = UITheme.card_pattern(card.tier)
 
 	_prestige_lbl.text = str(card.prestige) if card.prestige > 0 else ""
+	_tier_tag.text = ["", "源地", "商坊", "殿堂"][card.tier]
 	_bonus_icon.texture = UITheme.gem_icon(card.bonus)
 	_title_lbl.text = card.name
 
+	# Clear per-gem affordability check directly on each cost pip
+	var shortfall: Dictionary = pay_info.get("shortfall", {})
 	for g in GemTypes.BASE_GEMS:
 		var c_amt := int(card.cost.get(g, 0))
-		var pip: PanelContainer = _cost_pips[g]["panel"]
-		var lbl: Label = _cost_pips[g]["lbl"]
-		pip.visible = c_amt > 0
+		var d: Dictionary = _cost_pips[g]
+		var row: HBoxContainer = d["row"]
+		var pip: PanelContainer = d["panel"]
+		var lbl: Label = d["lbl"]
+		var hint: Label = d["hint"]
+		row.visible = c_amt > 0
 		if c_amt > 0:
 			lbl.text = str(c_amt)
+			var short_amt := int(shortfall.get(g, 0))
+			var sb := UITheme.make_chip_style(g, 999, 2)
+			sb.content_margin_left = 0
+			sb.content_margin_right = 0
+			sb.content_margin_top = 0
+			sb.content_margin_bottom = 0
+			if viewer != null and short_amt == 0:
+				sb.border_color = UITheme.AFFORD_GREEN
+				pip.modulate.a = 0.78
+				hint.text = "✓"
+				hint.add_theme_color_override("font_color", Color("68F0A8"))
+			elif viewer != null and short_amt > 0:
+				sb.border_color = Color("FF7B6B")
+				pip.modulate.a = 1.0
+				hint.text = "-%d" % short_amt
+				hint.add_theme_color_override("font_color", Color("FFB4A6"))
+			else:
+				pip.modulate.a = 1.0
+				hint.text = ""
+			pip.add_theme_stylebox_override("panel", sb)
 
-	_buy_btn.text = "打造" if is_affordable else ("差%d" % int(pay_info["gold_shortage"]))
-	_buy_btn.disabled = not (is_affordable and interactive)
-	UITheme.style_button(_buy_btn, Color("245C3A", 0.95) if is_affordable else Color("241D19", 0.92), UITheme.AFFORD_GREEN if is_affordable else UITheme.GOLD_DIM)
-
-	if _res_btn != null:
-		_res_btn.disabled = not (can_reserve and interactive)
-		UITheme.style_button(_res_btn, Color("4F3A22", 0.95), UITheme.GOLD_ACCENT)
+	# Clear status seal on card when affordable
+	if is_affordable and interactive:
+		_status_pill.visible = true
+		var gn := int(pay_info["gold_needed"])
+		var p_sb := StyleBoxFlat.new()
+		p_sb.bg_color = Color("1E5634", 0.92) if gn == 0 else Color("6B4F19", 0.94)
+		p_sb.border_color = UITheme.AFFORD_GREEN if gn == 0 else UITheme.GOLD_ACCENT
+		p_sb.set_border_width_all(1)
+		p_sb.set_corner_radius_all(4)
+		_status_pill.add_theme_stylebox_override("panel", p_sb)
+		_status_lbl.text = "可造" if gn == 0 else "金×%d" % gn
+		_status_lbl.add_theme_color_override("font_color", Color("E8FFE8") if gn == 0 else UITheme.GOLD_ACCENT)
+	else:
+		_status_pill.visible = false
 
 func _gui_input(event: InputEvent) -> void:
 	if card == null:
@@ -324,39 +365,36 @@ func _gui_input(event: InputEvent) -> void:
 		_art_mat.set_shader_parameter("rot_y_deg", (nx - 0.5) * 14.0)
 		_art_mat.set_shader_parameter("rot_x_deg", -(ny - 0.5) * 14.0)
 	elif interactive and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if is_affordable:
-			buy_requested.emit(tier, slot, reserved_idx)
-		elif can_reserve:
-			reserve_requested.emit(tier, slot)
+		SfxManager.play_click()
+		if float(Settings.get_value("anim_speed")) > 0.01:
+			TweenFX.punch_in(self, 0.22, 0.08)
+		card_tapped.emit(self)
 
 func _on_hover_enter() -> void:
-	if card == null:
+	if card == null or is_selected:
 		return
 	_is_hovered = true
 	z_index = 10
 	pivot_offset = size * 0.5
 	var border_col := UITheme.AFFORD_GREEN if (is_affordable and interactive) else UITheme.GOLD_ACCENT
-	add_theme_stylebox_override("panel", _make_card_style(border_col, 2, 12, Vector2(4, 9)))
-	_art_scrim.color = Color(0.06, 0.04, 0.03, 0.14)
-	if interactive:
-		_hover_bar.visible = true
+	add_theme_stylebox_override("panel", _make_card_style(border_col, 2, 11, Vector2(4, 8)))
+	_art_scrim.color = Color(0.05, 0.04, 0.03, 0.12)
 	if _art_mat != null:
-		_art_mat.set_shader_parameter("foil_strength", 0.8 if is_affordable else 0.45)
+		_art_mat.set_shader_parameter("foil_strength", 0.72 if is_affordable else 0.40)
 	if float(Settings.get_value("anim_speed")) > 0.01:
 		if _hover_tw != null and _hover_tw.is_running():
 			_hover_tw.kill()
 		_hover_tw = create_tween()
-		_hover_tw.tween_property(self, "scale", Vector2(1.06, 1.06), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		_hover_tw.tween_property(self, "scale", Vector2(1.045, 1.045), 0.11).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 func _on_hover_exit() -> void:
-	if card == null:
+	if card == null or is_selected:
 		return
 	_is_hovered = false
 	z_index = 0
-	_hover_bar.visible = false
 	var border_col := UITheme.AFFORD_GREEN if (is_affordable and interactive) else Color("C8B288", 0.72)
 	add_theme_stylebox_override("panel", _make_card_style(border_col, 2, 7, Vector2(3, 5)))
-	_art_scrim.color = Color(0.06, 0.04, 0.03, 0.25)
+	_art_scrim.color = Color(0.05, 0.04, 0.03, 0.22)
 	if _art_mat != null:
 		_art_mat.set_shader_parameter("rot_x_deg", 0.0)
 		_art_mat.set_shader_parameter("rot_y_deg", 0.0)
@@ -365,4 +403,4 @@ func _on_hover_exit() -> void:
 		if _hover_tw != null and _hover_tw.is_running():
 			_hover_tw.kill()
 		_hover_tw = create_tween()
-		_hover_tw.tween_property(self, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		_hover_tw.tween_property(self, "scale", Vector2.ONE, 0.11).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)

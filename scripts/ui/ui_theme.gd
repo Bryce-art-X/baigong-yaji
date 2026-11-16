@@ -44,16 +44,22 @@ static func table_bg() -> Texture2D:
 	_icon_cache["_table_bg"] = tex
 	return tex
 
-static func card_art(gem: String) -> Texture2D:
-	var key := "_art_%s" % gem
+static func card_art(gem: String, tier: int = 2) -> Texture2D:
+	var key := "_art_%d_%s" % [tier, gem]
 	if _icon_cache.has(key):
 		return _icon_cache[key]
-	var path := "res://assets/art/card_art_%s.jpg" % gem
-	if not ResourceLoader.exists(path):
-		return null
-	var tex: Texture2D = load(path)
-	_icon_cache[key] = tex
-	return tex
+	var candidates: Array[String] = []
+	if tier == 1:
+		candidates.append("res://assets/art/art_t1_%s.jpg" % gem)
+	elif tier == 3:
+		candidates.append("res://assets/art/art_t3_%s.jpg" % gem)
+	candidates.append("res://assets/art/card_art_%s.jpg" % gem)
+	for path in candidates:
+		if ResourceLoader.exists(path):
+			var tex: Texture2D = load(path)
+			_icon_cache[key] = tex
+			return tex
+	return null
 
 static func tier_bg_color(tier: int) -> Color:
 	match tier:

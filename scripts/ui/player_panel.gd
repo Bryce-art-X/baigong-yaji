@@ -1,5 +1,7 @@
 class_name PlayerPanel
 extends PanelContainer
+## Compact tabletop plaque for all players (and especially opponents), showing
+## score, 5-color discount columns, held chips, and mini card-backs for locked cards.
 
 signal detail_requested(player_index: int)
 
@@ -9,12 +11,15 @@ var _name_lbl: Label
 var _score_lbl: Label
 var _sub_lbl: Label
 var _badges: Dictionary = {} # gem -> {panel, lbl}
+var _lock_backs: Array[PanelContainer] = []
+var _lock_lbls: Array[Label] = []
 
 func _ensure_built() -> void:
 	if _built:
 		return
 	_built = true
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 4)
@@ -26,21 +31,34 @@ func _ensure_built() -> void:
 
 	_name_lbl = Label.new()
 	_name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_name_lbl.add_theme_font_size_override("font_size", 14)
+	_name_lbl.add_theme_font_size_override("font_size", 13)
 	hdr.add_child(_name_lbl)
+
+	# Mini locked card-back indicators (up to 3)
+	for _i in range(3):
+		var lb := PanelContainer.new()
+		lb.custom_minimum_size = Vector2(16, 22)
+		lb.visible = false
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color("362820")
+		sb.border_color = UITheme.GOLD_ACCENT
+		sb.set_border_width_all(1)
+		sb.set_corner_radius_all(3)
+		lb.add_theme_stylebox_override("panel", sb)
+		var ll := Label.new()
+		ll.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		ll.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		ll.add_theme_font_size_override("font_size", 9)
+		ll.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
+		lb.add_child(ll)
+		hdr.add_child(lb)
+		_lock_backs.append(lb)
+		_lock_lbls.append(ll)
 
 	_score_lbl = Label.new()
 	_score_lbl.add_theme_font_size_override("font_size", 15)
 	_score_lbl.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
 	hdr.add_child(_score_lbl)
-
-	var detail_btn := Button.new()
-	detail_btn.text = "藏品"
-	detail_btn.custom_minimum_size = Vector2(44, 26)
-	detail_btn.add_theme_font_size_override("font_size", 11)
-	UITheme.style_button(detail_btn, Color("2A201A"))
-	detail_btn.pressed.connect(func() -> void: detail_requested.emit(_player_index))
-	hdr.add_child(detail_btn)
 
 	_sub_lbl = Label.new()
 	_sub_lbl.add_theme_font_size_override("font_size", 11)
@@ -65,11 +83,11 @@ func update_player(p: PlayerState, is_current: bool) -> void:
 	_ensure_built()
 	_player_index = p.index
 	add_theme_stylebox_override("panel", UITheme.make_panel_style(
-		Color("33261F") if is_current else Color("1F1714"),
-		UITheme.GOLD_ACCENT if is_current else Color("4A3B31"),
+		Color("31231B", 0.92) if is_current else Color("1D1512", 0.84),
+		UITheme.GOLD_ACCENT if is_current else Color("544234", 0.75),
 		8,
 		2 if is_current else 1,
-		4
+		5
 	))
 
 	var ai_tag := ""
@@ -80,9 +98,16 @@ func update_player(p: PlayerState, is_current: bool) -> void:
 	_name_lbl.text = "%s%s" % [p.name, ai_tag]
 	_name_lbl.add_theme_color_override("font_color", UITheme.GOLD_ACCENT if is_current else UITheme.TEXT_MAIN)
 	_score_lbl.text = "%d 分" % p.get_score()
-	_sub_lbl.text = "已制 %d 件 · 留存 %d · 名士 %d · 材料 %d/10" % [
-		p.purchased.size(), p.reserved.size(), p.masters.size(), p.total_chips()
+	_sub_lbl.text = "已购 %d · 名士 %d · 货币 %d/10（点此查藏品）" % [
+		p.purchased.size(), p.masters.size(), p.total_chips()
 	]
+
+	for i in range(3):
+		if i < p.reserved.size():
+			_lock_backs[i].visible = true
+			_lock_lbls[i].text = ["", "壹", "贰", "叁"][p.reserved[i].tier]
+		else:
+			_lock_backs[i].visible = false
 
 	for g in GemTypes.ALL_GEMS:
 		var chip_n := int(p.chips[g])
@@ -97,3 +122,7 @@ func update_player(p: PlayerState, is_current: bool) -> void:
 				b_lbl.text = "%s%d(+%d)" % [GemTypes.gem_short(g), chip_n, disc_n]
 			else:
 				b_lbl.text = "%s%d" % [GemTypes.gem_short(g), chip_n]
+
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		detail_requested.emit(_player_index)

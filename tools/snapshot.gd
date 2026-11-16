@@ -1,13 +1,10 @@
 extends SceneTree
-## UI snapshot tool. Renders the main menu and an in-game board at several
-## resolutions (desktop + phone landscape) into tools/out/ for visual review.
-##
-## Usage (needs a GPU window, NOT --headless):
-##   godot --path . --script res://tools/snapshot.gd
+## UI snapshot tool. Renders main menu, fresh board, and active mid-game board
+## (with purchased stacks, reserved card, held chips, and selected card action bar)
+## at desktop + phone landscape resolutions into tools/out/.
 
 const RESOLUTIONS: Array[Vector2i] = [
 	Vector2i(1440, 900),   # desktop 16:10 (design size)
-	Vector2i(1920, 1080),  # desktop 16:9
 	Vector2i(1280, 720),   # minimum desktop
 	Vector2i(2400, 1080),  # phone landscape 20:9
 ]
@@ -31,11 +28,26 @@ func _run() -> void:
 
 		main_node._on_start_game([
 			{"name": "雅士甲", "is_ai": false, "ai_level": 1},
-			{"name": "墨匠乙", "is_ai": true, "ai_level": 1},
-			{"name": "瓷师丙", "is_ai": true, "ai_level": 1},
+			{"name": "墨匠乙", "is_ai": true, "ai_level": 1, "ai_persona": "artisan"},
+			{"name": "宗师丙", "is_ai": true, "ai_level": 2, "ai_persona": "scholar"},
 		], 15)
 		await _settle()
 		_save(out_dir.path_join("board_%s.png" % tag))
+
+		if res.x == 1440:
+			var board: Node = main_node._board
+			var p0 = board.state.players[0]
+			p0.chips = {"jade": 2, "porcelain": 3, "bamboo": 1, "cinnabar": 0, "ink": 1, "gold": 1}
+			p0.discounts = {"jade": 1, "porcelain": 2, "bamboo": 1, "cinnabar": 0, "ink": 1}
+			for g in ["jade", "porcelain", "bamboo", "cinnabar", "ink"]:
+				var c := CardData.CraftCard.new("sim_" + g, "试样", 1, g, 1 if g == "porcelain" else 0, {})
+				p0.purchased.append(c)
+			p0.purchased.append(CardData.CraftCard.new("sim_p2", "官窑", 2, "porcelain", 2, {}))
+			p0.reserved.append(board.state.board[2][0])
+			board._on_board_card_tapped(board._card_slots[1][0])
+			await create_timer(0.28).timeout
+			await _settle()
+			_save(out_dir.path_join("midgame_%s.png" % tag))
 
 		main_node.queue_free()
 		await process_frame

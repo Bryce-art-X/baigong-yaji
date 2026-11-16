@@ -10,8 +10,10 @@
 | `assets/svg/card_pattern_t*.svg` | 本项目原创 | 百工雅集项目 | 同项目 | 三阶卡框国风纹样 SVG |
 | `assets/fonts/LXGWWenKai-Regular.ttf` | [lxgw/LxgwWenKai](https://github.com/lxgw/LxgwWenKai) | 落霞孤鹜 (LXGW) | SIL OFL 1.0 | 霞鹜文楷 v1.511 开源中文字体 |
 | `assets/art/table_bg.jpg` | AI 生成（本项目定制） | 百工雅集项目 | 同项目 | 紫檀木纹水墨桌面背景 |
-| `assets/art/card_art_*.jpg` | AI 生成（本项目定制） | 百工雅集项目 | 同项目 | 五材国风工笔器物插画（玉/瓷/竹/砂/墨） |
-| `assets/shaders/card_3d_foil.gdshader` | [codevogel/faux-3d-perspective-shader-godot](https://github.com/codevogel/faux-3d-perspective-shader-godot) | Kamiel de Visser (codevogel) | MIT | 2D 伪 3D 透视倾斜着色器（扩展鎏金扫光） |
+| `assets/art/card_art_*.jpg`, `art_t1_*.jpg`, `art_t3_*.jpg` | AI 生成（本项目定制） | 百工雅集项目 | 同项目 | 三阶分阶工笔插画（采材源地 / 匠坊精品 / 传世殿堂） |
+| `addons/TweenFX/` | [EvilBunnyMan/TweenFX](https://github.com/EvilBunnyMan/TweenFX) | EvilBunnyMan | MIT | Godot 4 UI 动效库 |
+| `data/craft_data.json`（费用分布） | 参考 [bouk/splendimax](https://github.com/bouk/splendimax) | — | 开源数据集 | 经典 90 张牌费用与声望对称数值；中文名称与世界观原创 |
+| `assets/shaders/card_3d_foil.gdshader` | [codevogel/faux-3d-perspective-shader-godot](https://github.com/codevogel/faux-3d-perspective-shader-godot) | Kamiel de Visser (codevogel) | MIT | 2D 伪 3D 透视倾斜着色器（参考 `faketut/godot-handrow` MIT 动效思路扩展） |
 | `assets/audio/sfx/*.ogg` | [Kenney Casino Audio](https://kenney.nl/assets/casino-audio) | Kenney | CC0 1.0 | 真实纸牌翻拍与筹码碰撞音效 |
 | 音效与背景音乐 | 运行时程序合成（`sfx_manager.gd`, `bgm_manager.gd`） | 百工雅集项目 | 同项目 | 五声音阶背景乐与名士/胜利和弦 |
 

@@ -16,8 +16,11 @@ var _tutorial_step: int = 0
 var _last_human_idx: int = -1
 var _ai_timer: Timer
 
-var _tutorial_bar: PanelContainer
-var _tutorial_lbl: Label
+# Selected card state (works identically for PC click & Mobile tap)
+var _sel_card_source: String = "" # "" / "board" / "reserved"
+var _sel_tier: int = 0
+var _sel_slot: int = -1
+var _sel_res_idx: int = -1
 
 var _top_status_lbl: Label
 var _undo_btn: Button
@@ -27,9 +30,7 @@ var _player_panels: Array[PlayerPanel] = []
 var _master_slots: Array[MasterView] = []
 var _deck_btns: Dictionary = {} # tier -> Button
 var _card_slots: Dictionary = {} # tier -> Array[CardView]
-var _reserved_slots: Array[CardView] = []
-var _reserved_empty_lbl: Label
-var _reserved_title: Label
+var _dashboard: PlayerDashboard
 var _bank_slots: Dictionary = {} # gem -> {btn, sel_lbl, cnt_lbl}
 var _selection_tray: HBoxContainer
 var _selection_lbl: Label
@@ -37,6 +38,14 @@ var _confirm_take_btn: Button
 var _clear_take_btn: Button
 var _log_lbl: RichTextLabel
 
+var _card_action_panel: PanelContainer
+var _act_title_lbl: Label
+var _act_breakdown_lbl: Label
+var _act_buy_btn: Button
+var _act_res_btn: Button
+
+var _tutorial_bar: PanelContainer
+var _tutorial_lbl: Label
 var _fx: FxLayer
 var _curtain_overlay: ColorRect
 var _curtain_lbl: Label
@@ -59,6 +68,7 @@ func start_game(p_state: GameState, p_is_tutorial: bool = false, p_is_daily: boo
 	state = _controller.state
 	_selected_gems.clear()
 	_discard_pool.clear()
+	_clear_card_selection()
 	_stats_recorded = false
 	_is_tutorial = p_is_tutorial
 	_is_daily = p_is_daily
@@ -87,7 +97,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				_on_confirm_take_pressed()
 				get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_ESCAPE:
-			if _modal_overlay.visible and state.phase == GameState.TurnPhase.ACTION:
+			if _sel_card_source != "":
+				_clear_card_selection()
+				_refresh_board_and_dash()
+				get_viewport().set_input_as_handled()
+			elif _modal_overlay.visible and state.phase == GameState.TurnPhase.ACTION:
 				_modal_overlay.visible = false
 				get_viewport().set_input_as_handled()
 			elif not _selected_gems.is_empty():
@@ -115,17 +129,17 @@ func _build_skeleton() -> void:
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 14)
-	margin.add_theme_constant_override("margin_right", 14)
-	margin.add_theme_constant_override("margin_top", 10)
-	margin.add_theme_constant_override("margin_bottom", 10)
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
 	add_child(margin)
 
 	var main_vbox := VBoxContainer.new()
-	main_vbox.add_theme_constant_override("separation", 8)
+	main_vbox.add_theme_constant_override("separation", 6)
 	margin.add_child(main_vbox)
 
-	# Tutorial Guide Bar (hidden unless tutorial mode)
+	# Tutorial Guide Bar
 	_tutorial_bar = PanelContainer.new()
 	_tutorial_bar.visible = false
 	_tutorial_bar.add_theme_stylebox_override("panel", UITheme.make_panel_style(Color("263628"), UITheme.AFFORD_GREEN, 8, 1, 2))
@@ -147,13 +161,13 @@ func _build_skeleton() -> void:
 
 	var title_lbl := Label.new()
 	title_lbl.text = "百工雅集"
-	title_lbl.add_theme_font_size_override("font_size", 22)
+	title_lbl.add_theme_font_size_override("font_size", 20)
 	title_lbl.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
 	top_hbox.add_child(title_lbl)
 
 	_top_status_lbl = Label.new()
 	_top_status_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_top_status_lbl.add_theme_font_size_override("font_size", 15)
+	_top_status_lbl.add_theme_font_size_override("font_size", 14)
 	_top_status_lbl.add_theme_color_override("font_color", UITheme.TEXT_MAIN)
 	top_hbox.add_child(_top_status_lbl)
 
@@ -207,13 +221,13 @@ func _build_skeleton() -> void:
 	# Body 3 Columns
 	var body := HBoxContainer.new()
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_theme_constant_override("separation", 12)
+	body.add_theme_constant_override("separation", 10)
 	main_vbox.add_child(body)
 
-	# Left: Floating Player Plaques directly on tabletop
+	# Left: Floating Player Plaques + Action Log below
 	var left_v := VBoxContainer.new()
-	left_v.custom_minimum_size = Vector2(256, 0)
-	left_v.add_theme_constant_override("separation", 10)
+	left_v.custom_minimum_size = Vector2(222, 0)
+	left_v.add_theme_constant_override("separation", 6)
 	body.add_child(left_v)
 
 	for _i in range(4):
@@ -226,15 +240,37 @@ func _build_skeleton() -> void:
 		left_v.add_child(pp)
 		_player_panels.append(pp)
 
-	# Center: Direct tabletop placement (Masters + 3x4 Portrait Cards + Reserved)
+	var log_panel := PanelContainer.new()
+	log_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	log_panel.add_theme_stylebox_override("panel", UITheme.make_panel_style(Color("16100D", 0.72), Color("4E3D28", 0.55), 8, 1, 2))
+	left_v.add_child(log_panel)
+
+	var log_v := VBoxContainer.new()
+	log_v.add_theme_constant_override("separation", 4)
+	log_panel.add_child(log_v)
+
+	var log_hdr := Label.new()
+	log_hdr.text = "雅集纪要"
+	log_hdr.add_theme_font_size_override("font_size", 13)
+	log_hdr.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
+	log_v.add_child(log_hdr)
+
+	_log_lbl = RichTextLabel.new()
+	_log_lbl.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_log_lbl.scroll_following = true
+	_log_lbl.add_theme_font_size_override("normal_font_size", 11)
+	_log_lbl.add_theme_color_override("default_color", UITheme.TEXT_MUTED)
+	log_v.add_child(_log_lbl)
+
+	# Center: Masters + 3x4 Cards + Touch/PC Action Popover + 3-Zone PlayerDashboard
 	var center_v := VBoxContainer.new()
 	center_v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	center_v.add_theme_constant_override("separation", 10)
+	center_v.add_theme_constant_override("separation", 6)
 	body.add_child(center_v)
 
 	var masters_row := HBoxContainer.new()
 	masters_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	masters_row.add_theme_constant_override("separation", 12)
+	masters_row.add_theme_constant_override("separation", 10)
 	center_v.add_child(masters_row)
 
 	for _i in range(5):
@@ -248,17 +284,17 @@ func _build_skeleton() -> void:
 	center_v.add_child(tiers_center)
 
 	var tiers_box := VBoxContainer.new()
-	tiers_box.add_theme_constant_override("separation", 12)
+	tiers_box.add_theme_constant_override("separation", 8)
 	tiers_center.add_child(tiers_box)
 
 	for tier in [3, 2, 1]:
 		var row := HBoxContainer.new()
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		row.add_theme_constant_override("separation", 14)
+		row.add_theme_constant_override("separation", 10)
 		tiers_box.add_child(row)
 
 		var deck_btn := Button.new()
-		deck_btn.custom_minimum_size = Vector2(118, 166)
+		deck_btn.custom_minimum_size = Vector2(110, 154)
 		deck_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		deck_btn.pressed.connect(func() -> void: _on_reserve_deck(tier))
 		var pat := TextureRect.new()
@@ -272,72 +308,53 @@ func _build_skeleton() -> void:
 		_deck_btns[tier] = deck_btn
 
 		_card_slots[tier] = []
-		for slot in range(4):
+		for _slot in range(4):
 			var cv := CardView.new()
-			cv.buy_requested.connect(_on_buy_requested)
-			cv.reserve_requested.connect(_on_reserve_board)
+			cv.card_tapped.connect(_on_board_card_tapped)
 			row.add_child(cv)
 			_card_slots[tier].append(cv)
 
-	var res_hbox := HBoxContainer.new()
-	res_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	res_hbox.add_theme_constant_override("separation", 12)
-	center_v.add_child(res_hbox)
+	# Bottom: 3-Zone Player Dashboard
+	_dashboard = PlayerDashboard.new()
+	_dashboard.reserved_card_tapped.connect(_on_reserved_card_tapped)
+	_dashboard.inspect_requested.connect(func(idx: int) -> void:
+		if state != null and idx >= 0 and idx < state.players.size():
+			_show_player_detail_modal(state.players[idx])
+	)
+	center_v.add_child(_dashboard)
 
-	_reserved_title = Label.new()
-	_reserved_title.text = "留存\n图谱"
-	_reserved_title.add_theme_font_size_override("font_size", 13)
-	_reserved_title.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
-	res_hbox.add_child(_reserved_title)
-
-	var res_row := HBoxContainer.new()
-	res_row.add_theme_constant_override("separation", 10)
-	res_hbox.add_child(res_row)
-
-	_reserved_empty_lbl = Label.new()
-	_reserved_empty_lbl.add_theme_font_size_override("font_size", 13)
-	_reserved_empty_lbl.add_theme_color_override("font_color", UITheme.TEXT_MUTED)
-	res_row.add_child(_reserved_empty_lbl)
-
-	for _i in range(3):
-		var rcv := CardView.new()
-		rcv.visible = false
-		rcv.buy_requested.connect(_on_buy_requested)
-		res_row.add_child(rcv)
-		_reserved_slots.append(rcv)
-
-	# Right: Physical Round Chip Tray + Log
+	# Right: Physical Round Chip Tray
 	var right_panel := PanelContainer.new()
-	right_panel.custom_minimum_size = Vector2(262, 0)
+	right_panel.custom_minimum_size = Vector2(204, 0)
 	right_panel.add_theme_stylebox_override("panel", UITheme.make_panel_style(Color("17110E", 0.72), Color("5C4828", 0.5), 10, 1))
 	body.add_child(right_panel)
 
 	var right_v := VBoxContainer.new()
-	right_v.add_theme_constant_override("separation", 10)
+	right_v.add_theme_constant_override("separation", 8)
 	right_panel.add_child(right_v)
 
 	var bank_hdr := Label.new()
-	bank_hdr.text = "库房玉石（直点选取）"
+	bank_hdr.text = "库房玉石（点击拿取）"
 	bank_hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	bank_hdr.add_theme_font_size_override("font_size", 15)
+	bank_hdr.add_theme_font_size_override("font_size", 14)
 	bank_hdr.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
 	right_v.add_child(bank_hdr)
 
 	var bank_grid := GridContainer.new()
 	bank_grid.columns = 2
 	bank_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	bank_grid.add_theme_constant_override("h_separation", 16)
-	bank_grid.add_theme_constant_override("v_separation", 12)
+	bank_grid.add_theme_constant_override("h_separation", 12)
+	bank_grid.add_theme_constant_override("v_separation", 10)
 	right_v.add_child(bank_grid)
 
 	for g in GemTypes.ALL_GEMS:
 		var cell := VBoxContainer.new()
 		cell.alignment = BoxContainer.ALIGNMENT_CENTER
-		cell.add_theme_constant_override("separation", 3)
+		cell.add_theme_constant_override("separation", 2)
 		bank_grid.add_child(cell)
 
 		var chip_btn := Button.new()
-		chip_btn.custom_minimum_size = Vector2(78, 78)
+		chip_btn.custom_minimum_size = Vector2(68, 68)
 		chip_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		chip_btn.pressed.connect(func() -> void: _on_bank_gem_clicked(g))
 		cell.add_child(chip_btn)
@@ -356,7 +373,7 @@ func _build_skeleton() -> void:
 
 		var sel_lbl := Label.new()
 		sel_lbl.visible = false
-		sel_lbl.position = Vector2(52, 2)
+		sel_lbl.position = Vector2(42, 2)
 		sel_lbl.size = Vector2(26, 22)
 		sel_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		sel_lbl.add_theme_font_size_override("font_size", 14)
@@ -381,7 +398,7 @@ func _build_skeleton() -> void:
 	right_v.add_child(_selection_tray)
 
 	_selection_lbl = Label.new()
-	_selection_lbl.text = "点击玉石：3 异色或 2 同色"
+	_selection_lbl.text = "点击玉石：拿 3 异色或 2 同色"
 	_selection_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_selection_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_selection_lbl.add_theme_font_size_override("font_size", 12)
@@ -394,7 +411,7 @@ func _build_skeleton() -> void:
 
 	_confirm_take_btn = Button.new()
 	_confirm_take_btn.text = "确认拿取"
-	_confirm_take_btn.custom_minimum_size = Vector2(0, 38)
+	_confirm_take_btn.custom_minimum_size = Vector2(0, 44)
 	_confirm_take_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	UITheme.style_button(_confirm_take_btn, Color("295439"), UITheme.AFFORD_GREEN)
 	_confirm_take_btn.pressed.connect(_on_confirm_take_pressed)
@@ -402,7 +419,7 @@ func _build_skeleton() -> void:
 
 	_clear_take_btn = Button.new()
 	_clear_take_btn.text = "清空"
-	_clear_take_btn.custom_minimum_size = Vector2(64, 38)
+	_clear_take_btn.custom_minimum_size = Vector2(64, 44)
 	UITheme.style_button(_clear_take_btn)
 	_clear_take_btn.pressed.connect(func() -> void:
 		_selected_gems.clear()
@@ -410,22 +427,69 @@ func _build_skeleton() -> void:
 	)
 	sel_btns.add_child(_clear_take_btn)
 
-	var log_hdr := Label.new()
-	log_hdr.text = "雅集纪要"
-	log_hdr.add_theme_font_size_override("font_size", 15)
-	log_hdr.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
-	right_v.add_child(log_hdr)
-
-	_log_lbl = RichTextLabel.new()
-	_log_lbl.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_log_lbl.scroll_following = true
-	_log_lbl.add_theme_font_size_override("normal_font_size", 12)
-	_log_lbl.add_theme_color_override("default_color", UITheme.TEXT_MUTED)
-	right_v.add_child(_log_lbl)
-
-	# FX Overlay (non-blocking)
+	# FX Overlay
 	_fx = FxLayer.new()
 	add_child(_fx)
+
+	# Floating Unified PC/Mobile Card Action & Payment Breakdown Bar (anchored above dashboard)
+	_card_action_panel = PanelContainer.new()
+	_card_action_panel.visible = false
+	_card_action_panel.anchor_left = 0.5
+	_card_action_panel.anchor_right = 0.5
+	_card_action_panel.anchor_top = 1.0
+	_card_action_panel.anchor_bottom = 1.0
+	_card_action_panel.offset_left = -360.0
+	_card_action_panel.offset_right = 360.0
+	_card_action_panel.offset_top = -234.0
+	_card_action_panel.offset_bottom = -158.0
+	_card_action_panel.add_theme_stylebox_override("panel", UITheme.make_panel_style(Color("221813", 0.97), UITheme.GOLD_ACCENT, 12, 2, 14))
+	add_child(_card_action_panel)
+
+	var act_hbox := HBoxContainer.new()
+	act_hbox.add_theme_constant_override("separation", 12)
+	_card_action_panel.add_child(act_hbox)
+
+	var act_info_v := VBoxContainer.new()
+	act_info_v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	act_info_v.alignment = BoxContainer.ALIGNMENT_CENTER
+	act_info_v.add_theme_constant_override("separation", 2)
+	act_hbox.add_child(act_info_v)
+
+	_act_title_lbl = Label.new()
+	_act_title_lbl.add_theme_font_size_override("font_size", 15)
+	_act_title_lbl.add_theme_color_override("font_color", UITheme.GOLD_ACCENT)
+	act_info_v.add_child(_act_title_lbl)
+
+	_act_breakdown_lbl = Label.new()
+	_act_breakdown_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_act_breakdown_lbl.add_theme_font_size_override("font_size", 12)
+	_act_breakdown_lbl.add_theme_color_override("font_color", UITheme.TEXT_MAIN)
+	act_info_v.add_child(_act_breakdown_lbl)
+
+	_act_buy_btn = Button.new()
+	_act_buy_btn.text = "打造入库"
+	_act_buy_btn.custom_minimum_size = Vector2(110, 44)
+	_act_buy_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_act_buy_btn.pressed.connect(_on_action_buy_pressed)
+	act_hbox.add_child(_act_buy_btn)
+
+	_act_res_btn = Button.new()
+	_act_res_btn.text = "留存 (+1赤金)"
+	_act_res_btn.custom_minimum_size = Vector2(120, 44)
+	_act_res_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_act_res_btn.pressed.connect(_on_action_reserve_pressed)
+	act_hbox.add_child(_act_res_btn)
+
+	var act_cancel := Button.new()
+	act_cancel.text = "取消"
+	act_cancel.custom_minimum_size = Vector2(64, 44)
+	act_cancel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	UITheme.style_button(act_cancel)
+	act_cancel.pressed.connect(func() -> void:
+		_clear_card_selection()
+		_refresh_board_and_dash()
+	)
+	act_hbox.add_child(act_cancel)
 
 	# Hot-seat privacy curtain
 	_curtain_overlay = ColorRect.new()
@@ -511,6 +575,14 @@ func _on_cycle_anim_speed() -> void:
 	_update_anim_btn_label()
 	SfxManager.play_click()
 
+func _clear_card_selection() -> void:
+	_sel_card_source = ""
+	_sel_tier = 0
+	_sel_slot = -1
+	_sel_res_idx = -1
+	if _card_action_panel != null:
+		_card_action_panel.visible = false
+
 func _refresh_all() -> void:
 	if state == null:
 		return
@@ -527,8 +599,7 @@ func _refresh_all() -> void:
 
 	_refresh_players()
 	_refresh_masters()
-	_refresh_board()
-	_refresh_reserved()
+	_refresh_board_and_dash()
 	_refresh_bank_and_selection()
 	_refresh_log()
 	_refresh_tutorial_bar()
@@ -589,17 +660,18 @@ func _refresh_players() -> void:
 			pp.visible = false
 
 func _refresh_masters() -> void:
+	var viewer := _active_human_viewer()
 	for i in range(_master_slots.size()):
 		var mv := _master_slots[i]
 		if i < state.masters.size():
 			mv.visible = true
-			mv.setup(state.masters[i], false)
+			mv.setup(state.masters[i], false, viewer)
 		else:
 			mv.visible = false
 
-func _refresh_board() -> void:
+func _refresh_board_and_dash() -> void:
 	var human_turn := _is_human_turn()
-	var viewer := state.current_player()
+	var viewer := _active_human_viewer()
 
 	for tier in [3, 2, 1]:
 		var deck_btn: Button = _deck_btns[tier]
@@ -627,27 +699,111 @@ func _refresh_board() -> void:
 		var slots: Array = _card_slots[tier]
 		for slot in range(4):
 			var cv: CardView = slots[slot]
-			cv.setup_board_card(state.board[tier][slot], tier, slot, viewer, human_turn)
+			var is_sel: bool = (_sel_card_source == "board" and int(_sel_tier) == int(tier) and _sel_slot == slot)
+			cv.setup_board_card(state.board[tier][slot], tier, slot, viewer, human_turn, is_sel)
 
-func _refresh_reserved() -> void:
-	var viewer := state.current_player()
-	var human_turn := _is_human_turn()
-	_reserved_title.text = "%s\n留存(%d/3)" % [viewer.name, viewer.reserved.size()]
+	var sel_res := _sel_res_idx if _sel_card_source == "reserved" else -1
+	_dashboard.update_dashboard(viewer, human_turn, sel_res)
+	_refresh_card_action_panel(viewer, human_turn)
 
-	var show_cards := (not viewer.is_ai) and (not viewer.reserved.is_empty())
-	_reserved_empty_lbl.visible = not show_cards
-	if viewer.reserved.is_empty():
-		_reserved_empty_lbl.text = "暂无留存图谱（点击展示区卡牌“留存”可锁定图谱并获赠 1 枚赤金）"
-	elif viewer.is_ai:
-		_reserved_empty_lbl.text = "%s 留存了 %d 张图谱（暗置）" % [viewer.name, viewer.reserved.size()]
+func _active_human_viewer() -> PlayerState:
+	var cur := state.current_player()
+	if not cur.is_ai:
+		return cur
+	for p in state.players:
+		if not p.is_ai:
+			return p
+	return cur
 
-	for i in range(_reserved_slots.size()):
-		var rcv := _reserved_slots[i]
-		if show_cards and i < viewer.reserved.size():
-			rcv.visible = true
-			rcv.setup_reserved_card(viewer.reserved[i], i, viewer, human_turn)
+func _on_board_card_tapped(cv: CardView) -> void:
+	if cv.card == null or not _is_human_turn():
+		return
+	if _sel_card_source == "board" and _sel_tier == cv.tier and _sel_slot == cv.slot:
+		_clear_card_selection()
+	else:
+		_sel_card_source = "board"
+		_sel_tier = cv.tier
+		_sel_slot = cv.slot
+		_sel_res_idx = -1
+	_refresh_board_and_dash()
+	if _card_action_panel.visible and float(Settings.get_value("anim_speed")) > 0.01:
+		TweenFX.pop_in(_card_action_panel, 0.18)
+
+func _on_reserved_card_tapped(cv: CardView, res_idx: int) -> void:
+	if cv.card == null or not _is_human_turn():
+		return
+	if _sel_card_source == "reserved" and _sel_res_idx == res_idx:
+		_clear_card_selection()
+	else:
+		_sel_card_source = "reserved"
+		_sel_tier = cv.tier
+		_sel_slot = -1
+		_sel_res_idx = res_idx
+	_refresh_board_and_dash()
+	if _card_action_panel.visible and float(Settings.get_value("anim_speed")) > 0.01:
+		TweenFX.pop_in(_card_action_panel, 0.18)
+
+func _refresh_card_action_panel(viewer: PlayerState, human_turn: bool) -> void:
+	if _sel_card_source == "" or not human_turn:
+		_card_action_panel.visible = false
+		return
+
+	var card: CardData.CraftCard = null
+	if _sel_card_source == "board" and state.board.has(_sel_tier) and _sel_slot >= 0 and _sel_slot < 4:
+		card = state.board[_sel_tier][_sel_slot]
+	elif _sel_card_source == "reserved" and _sel_res_idx >= 0 and _sel_res_idx < viewer.reserved.size():
+		card = viewer.reserved[_sel_res_idx]
+
+	if card == null:
+		_clear_card_selection()
+		return
+
+	_card_action_panel.visible = true
+	var tier_names := ["", "一阶·源地", "二阶·商坊", "三阶·殿堂"]
+	var pt_str := " · +%d 声望" % card.prestige if card.prestige > 0 else ""
+	_act_title_lbl.text = "「%s」（%s · 产出 %s%s）" % [card.name, tier_names[card.tier], GemTypes.gem_name(card.bonus), pt_str]
+
+	var pay := viewer.compute_payment(card)
+	var sf: Dictionary = pay["shortfall"]
+	var parts: Array[String] = []
+	for g in GemTypes.BASE_GEMS:
+		var raw_c := int(card.cost.get(g, 0))
+		if raw_c == 0:
+			continue
+		var disc := int(viewer.discounts.get(g, 0))
+		var after_d := maxi(0, raw_c - disc)
+		var miss := int(sf.get(g, 0))
+		if miss == 0:
+			parts.append("%s %d(减%d) ✓" % [GemTypes.gem_short(g), raw_c, mini(raw_c, disc)])
 		else:
-			rcv.visible = false
+			parts.append("%s 缺%d(需%d减%d有%d)" % [GemTypes.gem_short(g), miss, raw_c, disc, int(viewer.chips[g])])
+
+	var gn := int(pay["gold_needed"])
+	var gs := int(pay["gold_shortage"])
+	var summary := ""
+	if bool(pay["valid"]):
+		summary = "可打造！" if gn == 0 else ("需用赤金 ×%d 补齐，可打造！" % gn)
+	else:
+		summary = "尚缺 %d 枚（赤金不足）" % gs
+	_act_breakdown_lbl.text = "费用检定：" + " | ".join(parts) + "  →  " + summary
+
+	_act_buy_btn.disabled = not bool(pay["valid"])
+	UITheme.style_button(_act_buy_btn, Color("295439") if bool(pay["valid"]) else Color("2A211C"), UITheme.AFFORD_GREEN if bool(pay["valid"]) else UITheme.GOLD_DIM)
+
+	_act_res_btn.visible = (_sel_card_source == "board")
+	var can_res := viewer.reserved.size() < GameState.MAX_RESERVED
+	_act_res_btn.disabled = not can_res
+	UITheme.style_button(_act_res_btn, Color("473522"), UITheme.GOLD_ACCENT if can_res else UITheme.GOLD_DIM)
+
+func _on_action_buy_pressed() -> void:
+	if _sel_card_source == "board":
+		_on_buy_requested(_sel_tier, _sel_slot, -1)
+	elif _sel_card_source == "reserved":
+		_on_buy_requested(_sel_tier, -1, _sel_res_idx)
+
+func _on_action_reserve_pressed() -> void:
+	if _sel_card_source == "board":
+		_on_reserve_board(_sel_tier, _sel_slot)
 
 func _refresh_bank_and_selection() -> void:
 	var human_turn := _is_human_turn()
@@ -704,9 +860,12 @@ func _refresh_bank_and_selection() -> void:
 func _on_bank_gem_clicked(g: String) -> void:
 	if not _is_human_turn() or g == GemTypes.GOLD:
 		return
+	var chip_btn: Button = _bank_slots[g]["btn"]
 	if _can_add_to_selection(g):
 		_selected_gems.append(g)
 		SfxManager.play_click()
+		if float(Settings.get_value("anim_speed")) > 0.01:
+			TweenFX.punch_in(chip_btn, 0.20, 0.10)
 		_refresh_bank_and_selection()
 	elif _selected_gems.has(g):
 		_selected_gems.erase(g)
@@ -738,16 +897,17 @@ func _on_events_applied(_action: GameAction, evs: Array) -> void:
 	EventBus.game_events.emit(evs)
 	if _fx == null:
 		return
+	var anim_on := float(Settings.get_value("anim_speed")) > 0.01
 	for ev in evs:
 		match str(ev.get("type", "")):
 			"take":
 				var pi := int(ev.get("player", 0))
 				if _is_tutorial and not state.players[pi].is_ai and _tutorial_step == 0:
 					_tutorial_step = 1
-				var target_pos := _player_center(pi)
 				var gems: Dictionary = ev.get("gems", {})
 				var delay := 0.0
 				for g in gems.keys():
+					var target_pos := _dashboard.get_chip_center(str(g)) if not state.players[pi].is_ai else _player_center(pi)
 					for _k in range(int(gems[g])):
 						_fx.fly_chip(str(g), _bank_center(str(g)), target_pos, delay)
 						delay += 0.07
@@ -756,40 +916,45 @@ func _on_events_applied(_action: GameAction, evs: Array) -> void:
 				if _is_tutorial and not state.players[pi].is_ai and _tutorial_step <= 1:
 					_tutorial_step = 2
 				if bool(ev.get("gold", false)):
-					_fx.fly_chip(GemTypes.GOLD, _bank_center(GemTypes.GOLD), _player_center(pi), 0.0)
+					var target_pos := _dashboard.get_chip_center(GemTypes.GOLD) if not state.players[pi].is_ai else _player_center(pi)
+					_fx.fly_chip(GemTypes.GOLD, _bank_center(GemTypes.GOLD), target_pos, 0.0)
 			"buy":
 				var pi := int(ev.get("player", 0))
 				if not state.players[pi].is_ai:
 					SaveManager.unlock_codex_entry("cards", str(ev.get("card_id", "")))
 					if _is_tutorial and _tutorial_step <= 2:
 						_tutorial_step = 3
-				var p_pos := _player_center(pi)
+				var bonus_g := ""
+				var card_tier := 1
+				for c in state.players[pi].purchased:
+					if c.id == str(ev.get("card_id", "")):
+						bonus_g = c.bonus
+						card_tier = c.tier
+						break
+				var target_pos := _dashboard.get_stack_center(bonus_g) if (not state.players[pi].is_ai and bonus_g != "") else _player_center(pi)
 				if str(ev.get("from", "")) == "board":
 					var t := int(ev.get("tier", 1))
 					var s := int(ev.get("slot", 0))
-					var card_pos := _card_center(t, s)
-					var bonus_g := ""
-					for c in state.players[pi].purchased:
-						if c.id == str(ev.get("card_id", "")):
-							bonus_g = c.bonus
-							break
 					if bonus_g != "":
-						_fx.fly_card(card_pos, p_pos, bonus_g)
+						_fx.fly_card(_card_center(t, s), target_pos, bonus_g)
 				var pay: Dictionary = ev.get("payment", {})
 				var delay := 0.0
 				for g in pay.keys():
+					var from_pos := _dashboard.get_chip_center(str(g)) if not state.players[pi].is_ai else _player_center(pi)
 					for _k in range(int(pay[g])):
-						_fx.fly_chip(str(g), p_pos, _bank_center(str(g)), delay)
+						_fx.fly_chip(str(g), from_pos, _bank_center(str(g)), delay)
 						delay += 0.04
 				var pts := int(ev.get("prestige", 0))
-				_fx.burst_gold(p_pos, 22 if pts > 0 else 12)
+				_fx.burst_gold(target_pos, 24 if pts > 0 else 12)
+				if anim_on and card_tier >= 3:
+					TweenFX.shake(self, 0.22, 4.0)
 				if pts > 0:
-					_fx.float_text("+%d 声望" % pts, p_pos, UITheme.GOLD_ACCENT)
+					_fx.float_text("+%d 声望" % pts, target_pos, UITheme.GOLD_ACCENT)
 			"refill":
 				var tier := int(ev.get("tier", 1))
 				var slot := int(ev.get("slot", 0))
-				if _card_slots.has(tier) and slot >= 0 and slot < 4:
-					_fx.pulse_control(_card_slots[tier][slot])
+				if _card_slots.has(tier) and slot >= 0 and slot < 4 and anim_on:
+					TweenFX.pop_in(_card_slots[tier][slot], 0.26)
 			"master":
 				var pi := int(ev.get("player", 0))
 				var mid := str(ev.get("master_id", ""))
@@ -800,7 +965,9 @@ func _on_events_applied(_action: GameAction, evs: Array) -> void:
 					if m.id == mid:
 						m_name = "%s·%s" % [m.name, m.title]
 						break
-				_fx.burst_gold(_player_center(pi), 28)
+				_fx.burst_gold(_player_center(pi), 30)
+				if anim_on:
+					TweenFX.shake(self, 0.25, 5.0)
 				_fx.show_banner("名士「%s」亲临 %s 的雅集 (+%d 声望)" % [m_name, state.players[pi].name, int(ev.get("prestige", 3))])
 			"final_round":
 				_fx.show_banner("【终局钟鸣】%s 率先达到 %d 声望，本轮结束后结算！" % [state.players[int(ev["player"])].name, int(ev["score"])])
@@ -831,6 +998,7 @@ func _on_undo_pressed() -> void:
 		state = _controller.state
 		_selected_gems.clear()
 		_discard_pool.clear()
+		_clear_card_selection()
 		SfxManager.play_click()
 		_refresh_all()
 
@@ -847,6 +1015,7 @@ func _on_confirm_take_pressed() -> void:
 	if bool(res["ok"]):
 		SfxManager.play_take_chip(take_cnt)
 		_selected_gems.clear()
+		_clear_card_selection()
 		_after_player_move()
 
 func _on_buy_requested(tier: int, slot: int, reserved_idx: int) -> void:
@@ -860,6 +1029,7 @@ func _on_buy_requested(tier: int, slot: int, reserved_idx: int) -> void:
 	var res := _controller.apply(act)
 	if bool(res["ok"]):
 		_selected_gems.clear()
+		_clear_card_selection()
 		SfxManager.play_buy(card_prestige)
 		if state.players[state.current_player_idx].masters.size() > prev_masters:
 			SfxManager.play_master()
@@ -869,6 +1039,7 @@ func _on_reserve_board(tier: int, slot: int) -> void:
 	var res := _controller.apply(GameAction.reserve_board(tier, slot))
 	if bool(res["ok"]):
 		_selected_gems.clear()
+		_clear_card_selection()
 		SfxManager.play_reserve()
 		_after_player_move()
 
@@ -876,6 +1047,7 @@ func _on_reserve_deck(tier: int) -> void:
 	var res := _controller.apply(GameAction.reserve_deck(tier))
 	if bool(res["ok"]):
 		_selected_gems.clear()
+		_clear_card_selection()
 		SfxManager.play_reserve()
 		_after_player_move()
 
@@ -898,7 +1070,6 @@ func _on_ai_timer_timeout() -> void:
 		AIAgent.take_turn_step(state)
 		if state.history.size() > prev_hist:
 			var act := GameAction.from_dict(state.history.back())
-			# Trigger visual/SFX feedback for AI actions too
 			var evs: Array = []
 			match act.type:
 				GameAction.Type.TAKE_DIFFERENT:
@@ -932,6 +1103,8 @@ func _clear_modal() -> void:
 	for c in _modal_content.get_children():
 		c.queue_free()
 	_modal_overlay.visible = true
+	if float(Settings.get_value("anim_speed")) > 0.01:
+		TweenFX.pop_in(_modal_panel, 0.22)
 
 func _show_discard_modal() -> void:
 	_clear_modal()
@@ -1101,7 +1274,7 @@ func _show_rules_modal() -> void:
 		+ "2. 手中材料上限 10 枚，超出须在回合末归还多余部分。\n"
 		+ "3. 永久折扣达到名士要求时，名士自动亲临雅集（+3 声望）。\n"
 		+ "4. 任意匠师达到目标声望（默认 15 分）触发终局轮，该轮结束后分高者胜（同分比制成器物少者胜）。\n"
-		+ "5. 快捷键：Enter 确认拿取 · Ctrl+Z 悔棋 · Esc 清空选择。"
+		+ "5. 操作：点击任意卡牌即可查看详细费用拆解并选择「打造」或「留存」，PC/手机触控一致。"
 	)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD
 	body.add_theme_font_size_override("font_size", 13)
@@ -1161,9 +1334,9 @@ func _refresh_tutorial_bar() -> void:
 	if _tutorial_bar == null or not _is_tutorial:
 		return
 	var tips: Array[String] = [
-		"【新手引导 1/4】请先点击右侧「库房材料」选取 3 种不同材料，再点击「确认拿取」。",
-		"【新手引导 2/4】点击展示区任意一张图谱的「留存」按钮，锁定图谱并获赠 1 枚赤金（百搭）。",
-		"【新手引导 3/4】绿色边框的器物表示材料充足！点击「打造」制成你的第一件器物，获得永久折扣。",
-		"【新手引导 4/4】继续采材打造，率先达到 6 声望即可完成雅集试炼！",
+		"【新手引导 1/4】请先点击右侧「库房玉石」选取 3 种不同材料，再点击「确认拿取」。",
+		"【新手引导 2/4】点击展示区任意一张图谱，在下方弹出条点击「留存 (+1赤金)」，锁定图谱并获赠赤金。",
+		"【新手引导 3/4】绿色边框带「可造」印章的器物表示材料充足！点击它再点「打造入库」即可获得永久折扣。",
+		"【新手引导 4/4】继续采材打造并堆叠 5 色折扣柱，率先达到 6 声望即可完成雅集试炼！",
 	]
 	_tutorial_lbl.text = tips[clampi(_tutorial_step, 0, tips.size() - 1)]
